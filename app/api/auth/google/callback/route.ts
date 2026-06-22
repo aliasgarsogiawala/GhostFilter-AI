@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.redirect(new URL("/?connect=success", req.url));
-  } catch {
+  } catch (err) {
+    console.error("Google OAuth callback failed:", err);
     return NextResponse.redirect(new URL("/?connect=error", req.url));
   }
 }
