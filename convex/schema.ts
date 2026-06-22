@@ -1,0 +1,51 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+  // One row per account a browser has connected (Gmail now; other providers
+  // render as "Coming Soon" in the UI until they get a real OAuth callback).
+  connections: defineTable({
+    ownerId: v.string(), // anonymous client id, stored in a cookie — no full auth system
+    provider: v.union(v.literal("gmail"), v.literal("github")),
+    status: v.union(v.literal("connected"), v.literal("disconnected")),
+    accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    accountEmail: v.optional(v.string()),
+    lastScannedAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_provider", ["ownerId", "provider"]),
+
+  // One row per analyzed message, whether it came from a connected account's
+  // scan or the manual paste-a-message analyzer (connectionId is undefined for manual).
+  scanResults: defineTable({
+    ownerId: v.string(),
+    connectionId: v.optional(v.id("connections")),
+    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("manual")),
+    externalId: v.optional(v.string()), // e.g. Gmail message id, for de-duplication
+    subject: v.optional(v.string()),
+    snippet: v.string(),
+    verdict: v.union(v.literal("safe"), v.literal("suspicious"), v.literal("scam")),
+    mlScore: v.number(), // 0-1, raw classifier output
+    confidence: v.number(), // 0-100, final displayed confidence
+    summary: v.string(),
+    recommendation: v.string(),
+    flaggedPhrases: v.array(
+      v.object({
+        phrase: v.string(),
+        reason: v.string(),
+        severity: v.union(v.literal("amber"), v.literal("red")),
+      })
+    ),
+    signals: v.array(
+      v.object({
+        label: v.string(),
+        value: v.number(), // 0-100
+      })
+    ),
+    aiReviewed: v.boolean(), // false if the ML score never crossed the Gemini-review threshold
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_connection_external", ["connectionId", "externalId"]),
+});
