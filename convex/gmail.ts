@@ -102,7 +102,7 @@ export const scanInbox = action({
         provider: "gmail",
         externalId: m.id,
         subject,
-        snippet: body.slice(0, 280),
+        snippet: body.slice(0, 4000),
         verdict: result.verdict,
         mlScore: result.mlScore,
         confidence: result.confidence,

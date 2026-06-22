@@ -6,6 +6,7 @@ import { internal } from "./_generated/api";
 import { scoreMessage, ML_REVIEW_THRESHOLD } from "../lib/ml-classifier";
 import { analyzeLinks, type LinkFinding } from "../lib/heuristics";
 import { reviewWithGemini, type GeminiVerdict } from "../lib/gemini";
+import { detectPromptInjection, type InjectionFinding } from "../lib/promptInjection";
 
 const SIGNAL_LABELS = [
   "Urgency Language",
@@ -13,6 +14,7 @@ const SIGNAL_LABELS = [
   "Suspicious Links",
   "Grammar/Spelling Anomalies",
   "Credential or Payment Request",
+  "AI Manipulation Attempt",
 ] as const;
 
 const URGENCY_HINTS = [
@@ -25,7 +27,12 @@ const URGENCY_HINTS = [
   "expire",
 ];
 
-function baselineSignals(mlScore: number, links: LinkFinding[], lowerText: string) {
+function baselineSignals(
+  mlScore: number,
+  links: LinkFinding[],
+  lowerText: string,
+  injection: InjectionFinding
+) {
   const urgencyHits = URGENCY_HINTS.filter((k) => lowerText.includes(k)).length;
   const lookalikeHit = links.some((l) => l.lookalike);
   const suspiciousLinkHit = links.some((l) => l.isShortened || l.lookalike || l.expanded?.blocked);
@@ -39,6 +46,7 @@ function baselineSignals(mlScore: number, links: LinkFinding[], lowerText: strin
     { label: SIGNAL_LABELS[2], value: suspiciousLinkHit ? 75 : links.length ? 15 : 0 },
     { label: SIGNAL_LABELS[3], value: Math.round(mlScore * 40) },
     { label: SIGNAL_LABELS[4], value: credentialHit ? 70 : 0 },
+    { label: SIGNAL_LABELS[5], value: injection.detected ? 95 : 0 },
   ];
 }
 
@@ -63,7 +71,8 @@ export interface PipelineResult {
 export async function runPipeline(text: string): Promise<PipelineResult> {
   const mlScore = scoreMessage(text);
   const links = await analyzeLinks(text);
-  const hasHardHeuristicHit = links.some((l) => l.lookalike || l.expanded?.blocked);
+  const injection = detectPromptInjection(text);
+  const hasHardHeuristicHit = links.some((l) => l.lookalike || l.expanded?.blocked) || injection.detected;
   const shouldEscalate = mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit;
   const lowerText = text.toLowerCase();
 
@@ -77,19 +86,19 @@ export async function runPipeline(text: string): Promise<PipelineResult> {
       recommendation:
         "This looks fine, but stay cautious with any unexpected request for money, codes, or personal info.",
       flaggedPhrases: [],
-      signals: baselineSignals(mlScore, links, lowerText),
+      signals: baselineSignals(mlScore, links, lowerText, injection),
       aiReviewed: false,
     };
   }
 
   let ai: GeminiVerdict;
   try {
-    ai = await reviewWithGemini(text, mlScore, links);
+    ai = await reviewWithGemini(text, mlScore, links, injection);
   } catch (err) {
     // Gemini failed (missing key, rate limit, network) — degrade to a heuristic-only
     // verdict instead of crashing the whole analysis.
     return {
-      verdict: hasHardHeuristicHit ? "suspicious" : mlScore >= 0.7 ? "scam" : "suspicious",
+      verdict: injection.detected ? "scam" : hasHardHeuristicHit ? "suspicious" : mlScore >= 0.7 ? "scam" : "suspicious",
       confidence: Math.round(mlScore * 100),
       mlScore,
       summary: `AI review unavailable (${
@@ -97,19 +106,22 @@ export async function runPipeline(text: string): Promise<PipelineResult> {
       }); showing triage-only result.`,
       recommendation: "Treat this message with caution and verify through an official channel before acting on it.",
       flaggedPhrases: [],
-      signals: baselineSignals(mlScore, links, lowerText),
+      signals: baselineSignals(mlScore, links, lowerText, injection),
       aiReviewed: false,
     };
   }
 
-  let signals = ai.signals.length ? ai.signals : baselineSignals(mlScore, links, lowerText);
+  let signals = ai.signals.length ? ai.signals : baselineSignals(mlScore, links, lowerText, injection);
   let verdict = ai.verdict;
   if (hasHardHeuristicHit) {
     // Don't let the model silently downplay a confirmed heuristic hit.
-    signals = signals.map((s) =>
-      s.label === SIGNAL_LABELS[1] ? { ...s, value: Math.max(s.value, 90) } : s
-    );
-    if (verdict === "safe") verdict = "suspicious";
+    signals = signals.map((s) => {
+      if (s.label === SIGNAL_LABELS[1] && links.some((l) => l.lookalike)) return { ...s, value: Math.max(s.value, 90) };
+      if (s.label === SIGNAL_LABELS[5] && injection.detected) return { ...s, value: Math.max(s.value, 95) };
+      return s;
+    });
+    if (injection.detected) verdict = "scam";
+    else if (verdict === "safe") verdict = "suspicious";
   }
 
   return {
@@ -131,7 +143,7 @@ export const analyzeMessage = action({
     const id: string = await ctx.runMutation(internal.scanResults.insert, {
       ownerId,
       provider: "manual",
-      snippet: text.slice(0, 280),
+      snippet: text.slice(0, 4000),
       verdict: result.verdict,
       mlScore: result.mlScore,
       confidence: result.confidence,
