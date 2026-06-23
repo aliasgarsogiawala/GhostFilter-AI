@@ -9,6 +9,8 @@
  */
 
 import type * as connections from "../connections.js";
+import type * as drive from "../drive.js";
+import type * as github from "../github.js";
 import type * as gmail from "../gmail.js";
 import type * as pipeline from "../pipeline.js";
 import type * as scanResults from "../scanResults.js";
@@ -21,6 +23,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   connections: typeof connections;
+  drive: typeof drive;
+  github: typeof github;
   gmail: typeof gmail;
   pipeline: typeof pipeline;
   scanResults: typeof scanResults;

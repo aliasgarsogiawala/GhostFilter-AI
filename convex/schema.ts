@@ -12,6 +12,7 @@ export default defineSchema({
     refreshToken: v.optional(v.string()),
     expiresAt: v.optional(v.number()),
     accountEmail: v.optional(v.string()),
+    accountName: v.optional(v.string()), // e.g. GitHub @handle
     lastScannedAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])

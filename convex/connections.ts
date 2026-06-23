@@ -38,6 +38,37 @@ export const upsertGmail = mutation({
   },
 });
 
+export const upsertGithub = mutation({
+  args: {
+    ownerId: v.string(),
+    accessToken: v.string(),
+    accountName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("connections")
+      .withIndex("by_owner_provider", (q) => q.eq("ownerId", args.ownerId).eq("provider", "github"))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: "connected",
+        accessToken: args.accessToken,
+        accountName: args.accountName ?? existing.accountName,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("connections", {
+      ownerId: args.ownerId,
+      provider: "github",
+      status: "connected",
+      accessToken: args.accessToken,
+      accountName: args.accountName,
+    });
+  },
+});
+
 // Public list — strips tokens before returning, never expose them to the client.
 export const listForOwner = query({
   args: { ownerId: v.string() },
@@ -70,6 +101,17 @@ export const getActiveGmail = internalQuery({
     const row = await ctx.db
       .query("connections")
       .withIndex("by_owner_provider", (q) => q.eq("ownerId", ownerId).eq("provider", "gmail"))
+      .first();
+    return row && row.status === "connected" ? row : null;
+  },
+});
+
+export const getActiveGithub = internalQuery({
+  args: { ownerId: v.string() },
+  handler: async (ctx, { ownerId }) => {
+    const row = await ctx.db
+      .query("connections")
+      .withIndex("by_owner_provider", (q) => q.eq("ownerId", ownerId).eq("provider", "github"))
       .first();
     return row && row.status === "connected" ? row : null;
   },

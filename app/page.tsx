@@ -7,7 +7,6 @@ import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motio
 import {
   Mail,
   Code2,
-  Cloud,
   Plug,
   Unlink,
   Scan,
@@ -19,7 +18,6 @@ import {
   ScanSearch,
   LoaderCircle,
   ChevronRight,
-  Crosshair,
   ExternalLink,
   Image as ImageIcon,
   Paperclip,
@@ -108,13 +106,6 @@ const EXAMPLES = [
     text: "Hey! Are we still on for lunch tomorrow at noon? Let me know if that still works for you.",
   },
 ];
-
-const PROVIDERS = [
-  { id: "gmail", label: "Gmail", icon: Mail, live: true },
-  { id: "github", label: "GitHub", icon: Code2, live: false },
-  { id: "drive", label: "Google Drive", icon: Cloud, live: false },
-  { id: "outlook", label: "Outlook", icon: Mail, live: false },
-] as const;
 
 // Channels where personal messages CAN'T be read by a web app (platform restriction) —
 // users paste these in manually instead. Honest, and still genuinely useful.
@@ -322,6 +313,86 @@ function SignalBar({ label, value }: { label: string; value: number }) {
   );
 }
 
+/** Custom brand mark: a protective shield crossed by a scan-line with a center node —
+ *  "scanning shield". Animated scan sweep on the line for a subtle bit of life. */
+function GhostMark() {
+  return (
+    <div
+      className="relative flex h-9 w-9 items-center justify-center rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c0c10]"
+      style={{ boxShadow: "2px 2px 0 0 #1fe3ad" }}
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+        <path
+          d="M12 2.5 L19.5 5.5 V11 C19.5 15.8 16.2 19.2 12 21.5 C7.8 19.2 4.5 15.8 4.5 11 V5.5 Z"
+          stroke="#1fe3ad"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+        <circle cx="12" cy="11" r="1.5" fill="#1fe3ad" />
+        <motion.line
+          x1="6.6"
+          x2="17.4"
+          y1={7}
+          y2={7}
+          stroke="#1fe3ad"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          initial={{ y1: 7, y2: 7, opacity: 0.35 }}
+          animate={{ y1: [7, 15, 7], y2: [7, 15, 7], opacity: [0.35, 1, 0.35] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function ScanButton({
+  label,
+  busy,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center gap-1 rounded border-[1.5px] border-[#1fe3ad] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-[#1fe3ad] hover:text-[#06231c] disabled:opacity-50"
+    >
+      {busy ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Scan className="h-3 w-3" />}
+      {label}
+    </button>
+  );
+}
+
+function ConnectButton({
+  href,
+  icon: Icon,
+  label,
+  sub,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  sub?: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="group flex items-center gap-2 rounded-md border-[1.5px] border-[#34343e] bg-[#121217] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[#1fe3ad]"
+      style={{ boxShadow: "2px 2px 0 0 #000" }}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+      {sub && <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-600 group-hover:text-[#3eeec0]">{sub}</span>}
+    </a>
+  );
+}
+
 function SectionLabel({
   icon: Icon,
   children,
@@ -413,17 +484,20 @@ export default function GhostFilterDashboard() {
 
   const analyzeMessage = useAction(api.pipeline.analyzeMessage);
   const scanInbox = useAction(api.gmail.scanInbox);
+  const scanDrive = useAction(api.drive.scanDrive);
+  const scanGithub = useAction(api.github.scanNotifications);
   const disconnect = useMutation(api.connections.disconnect);
 
   const [messageText, setMessageText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  const [scanningKind, setScanningKind] = useState<"inbox" | "drive" | "github" | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sourceHint, setSourceHint] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const gmailConnection = connections?.find((c) => c.provider === "gmail" && c.status === "connected");
+  const githubConnection = connections?.find((c) => c.provider === "github" && c.status === "connected");
   const selected = scans?.find((s) => s._id === selectedId) ?? scans?.[0];
 
   const analyzeText = async (text: string) => {
@@ -445,22 +519,25 @@ export default function GhostFilterDashboard() {
     textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const handleScanNow = async () => {
-    if (!ownerId || scanning) return;
-    setScanning(true);
+  const runScan = async (kind: "inbox" | "drive" | "github") => {
+    if (!ownerId || scanningKind) return;
+    setScanningKind(kind);
     setScanError(null);
     try {
-      await scanInbox({ ownerId });
+      if (kind === "inbox") await scanInbox({ ownerId });
+      else if (kind === "drive") await scanDrive({ ownerId });
+      else await scanGithub({ ownerId });
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Scan failed");
     } finally {
-      setScanning(false);
+      setScanningKind(null);
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!ownerId || !gmailConnection) return;
-    await disconnect({ connectionId: gmailConnection._id as never, ownerId });
+  const handleDisconnect = async (id?: string) => {
+    const target = id ?? gmailConnection?._id;
+    if (!ownerId || !target) return;
+    await disconnect({ connectionId: target as never, ownerId });
   };
 
   const tone = selected ? verdictTone(selected.verdict) : "clear";
@@ -471,16 +548,13 @@ export default function GhostFilterDashboard() {
     <div className="bg-dot-grid min-h-screen w-full text-zinc-300">
       <header className="relative z-10 flex flex-col gap-2 border-b-[1.5px] border-[#27272f] bg-[#121217] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c0c10]"
-            style={{ boxShadow: "2px 2px 0 0 #1fe3ad" }}
-          >
-            <Crosshair className="h-4.5 w-4.5 text-[#1fe3ad]" />
-          </div>
+          <GhostMark />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-extrabold tracking-tight text-zinc-50">
-                GHOSTFILTER AI
+              <h1 className="text-[17px] tracking-tight text-zinc-50">
+                <span className="font-bold">Ghost</span>
+                <span className="font-light text-zinc-400">Filter</span>
+                <span className="ml-1 align-top text-[10px] font-bold text-[#1fe3ad]">AI</span>
               </h1>
               <span className="rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
                 Scam &amp; Phishing Shield
@@ -564,58 +638,68 @@ export default function GhostFilterDashboard() {
         >
           <SectionLabel icon={Plug}>Connect Accounts</SectionLabel>
           <div className="flex flex-wrap gap-2 border-b-[1.5px] border-[#27272f] px-5 py-4">
-            {PROVIDERS.map((p) => {
-              const Icon = p.icon;
-              if (p.id === "gmail" && gmailConnection) {
-                return (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-2 rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c1a16] px-3 py-2 text-[11px] text-[#3eeec0]"
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className="font-bold">{gmailConnection.accountEmail ?? "Gmail connected"}</span>
-                    <button
-                      onClick={handleScanNow}
-                      disabled={scanning}
-                      className="ml-2 flex items-center gap-1 rounded border-[1.5px] border-[#1fe3ad] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-[#1fe3ad] hover:text-[#06231c] disabled:opacity-50"
-                    >
-                      {scanning ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Scan className="h-3 w-3" />}
-                      Scan Now
-                    </button>
-                    <button
-                      onClick={handleDisconnect}
-                      className="ml-1 flex items-center gap-1 rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
-                    >
-                      <Unlink className="h-3 w-3" />
-                      Disconnect
-                    </button>
-                  </div>
-                );
-              }
-              if (p.id === "gmail" && ownerId) {
-                return (
-                  <a
-                    key={p.id}
-                    href={`/api/auth/google?ownerId=${ownerId}`}
-                    className="flex items-center gap-2 rounded-md border-[1.5px] border-[#34343e] bg-[#121217] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[#1fe3ad]"
-                    style={{ boxShadow: "2px 2px 0 0 #000" }}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    Connect {p.label}
-                  </a>
-                );
-              }
-              return (
-                <div
-                  key={p.id}
-                  className="flex cursor-not-allowed items-center gap-2 rounded-md border-[1.5px] border-dashed border-[#27272f] px-3 py-2 text-[11px] text-zinc-600"
+            {/* Google (Gmail + Drive share one connection) */}
+            {gmailConnection ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c1a16] px-3 py-2 text-[11px] text-[#3eeec0]">
+                <Mail className="h-3.5 w-3.5" />
+                <span className="font-bold">{gmailConnection.accountEmail ?? "Google connected"}</span>
+                <ScanButton
+                  label="Scan Inbox"
+                  busy={scanningKind === "inbox"}
+                  disabled={!!scanningKind}
+                  onClick={() => runScan("inbox")}
+                />
+                <ScanButton
+                  label="Scan Drive"
+                  busy={scanningKind === "drive"}
+                  disabled={!!scanningKind}
+                  onClick={() => runScan("drive")}
+                />
+                <button
+                  onClick={() => handleDisconnect(gmailConnection._id)}
+                  className="flex items-center gap-1 rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {p.label}
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-700">Soon</span>
-                </div>
-              );
-            })}
+                  <Unlink className="h-3 w-3" />
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              ownerId && (
+                <ConnectButton href={`/api/auth/google?ownerId=${ownerId}`} icon={Mail} label="Connect Google" sub="Gmail + Drive" />
+              )
+            )}
+
+            {/* GitHub */}
+            {githubConnection ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c1a16] px-3 py-2 text-[11px] text-[#3eeec0]">
+                <Code2 className="h-3.5 w-3.5" />
+                <span className="font-bold">{githubConnection.accountName ? `@${githubConnection.accountName}` : "GitHub connected"}</span>
+                <ScanButton
+                  label="Scan"
+                  busy={scanningKind === "github"}
+                  disabled={!!scanningKind}
+                  onClick={() => runScan("github")}
+                />
+                <button
+                  onClick={() => handleDisconnect(githubConnection._id)}
+                  className="flex items-center gap-1 rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
+                >
+                  <Unlink className="h-3 w-3" />
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              ownerId && (
+                <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect GitHub" sub="Notifications" />
+              )
+            )}
+
+            {/* Outlook — not built yet */}
+            <div className="flex cursor-not-allowed items-center gap-2 rounded-md border-[1.5px] border-dashed border-[#27272f] px-3 py-2 text-[11px] text-zinc-600">
+              <Mail className="h-3.5 w-3.5" />
+              Outlook
+              <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-700">Soon</span>
+            </div>
           </div>
           {scanError && (
             <p className="border-b-[1.5px] border-[#27272f] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]">
@@ -890,7 +974,7 @@ export default function GhostFilterDashboard() {
 
             {gmailConnection && (
               <button
-                onClick={handleDisconnect}
+                onClick={() => handleDisconnect(gmailConnection._id)}
                 className="flex items-center justify-center gap-1.5 rounded-md border-[1.5px] border-[#27272f] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
               >
                 <Trash2 className="h-3 w-3" />

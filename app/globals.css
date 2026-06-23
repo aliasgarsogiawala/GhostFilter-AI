@@ -15,8 +15,8 @@
 @theme inline {
   --color-background: var(--ink);
   --color-foreground: #e7e7ea;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-display);
+  --font-mono: var(--font-data);
 }
 
 body {

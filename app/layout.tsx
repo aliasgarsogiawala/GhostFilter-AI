@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Space Grotesk (geometric, characterful) for UI + display, JetBrains Mono for
+// data/metrics — deliberately not the Next.js default Geist, which reads as a starter template.
+const displaySans = Space_Grotesk({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dataMono = JetBrains_Mono({
+  variable: "--font-data",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +30,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${displaySans.variable} ${dataMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ConvexClientProvider>{children}</ConvexClientProvider>

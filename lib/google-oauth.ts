@@ -1,7 +1,9 @@
 import { google } from "googleapis";
 
+// One Google connection covers both Gmail and Drive scanning (read-only).
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/drive.readonly",
   "openid",
   "email",
 ];
