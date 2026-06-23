@@ -23,6 +23,35 @@ export const insert = internalMutation({
     ),
     signals: v.array(v.object({ label: v.string(), value: v.number() })),
     aiReviewed: v.boolean(),
+    linkIntel: v.optional(
+      v.array(
+        v.object({
+          url: v.string(),
+          domain: v.string(),
+          vtMalicious: v.number(),
+          vtSuspicious: v.number(),
+        })
+      )
+    ),
+    screenshot: v.optional(
+      v.object({
+        url: v.string(),
+        resultUrl: v.string(),
+        screenshotUrl: v.string(),
+        ready: v.boolean(),
+      })
+    ),
+    attachmentIntel: v.optional(
+      v.array(
+        v.object({
+          filename: v.string(),
+          sha256: v.string(),
+          found: v.boolean(),
+          vtMalicious: v.number(),
+          vtSuspicious: v.number(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("scanResults", args);

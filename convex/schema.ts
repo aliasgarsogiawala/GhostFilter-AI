@@ -45,6 +45,35 @@ export default defineSchema({
       })
     ),
     aiReviewed: v.boolean(), // false if the ML score never crossed the Gemini-review threshold
+    linkIntel: v.optional(
+      v.array(
+        v.object({
+          url: v.string(),
+          domain: v.string(),
+          vtMalicious: v.number(),
+          vtSuspicious: v.number(),
+        })
+      )
+    ),
+    screenshot: v.optional(
+      v.object({
+        url: v.string(),
+        resultUrl: v.string(),
+        screenshotUrl: v.string(),
+        ready: v.boolean(),
+      })
+    ),
+    attachmentIntel: v.optional(
+      v.array(
+        v.object({
+          filename: v.string(),
+          sha256: v.string(),
+          found: v.boolean(),
+          vtMalicious: v.number(),
+          vtSuspicious: v.number(),
+        })
+      )
+    ),
   })
     .index("by_owner", ["ownerId"])
     .index("by_connection_external", ["connectionId", "externalId"]),

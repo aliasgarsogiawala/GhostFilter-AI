@@ -1,10 +1,12 @@
 "use node";
 
+import { createHash } from "node:crypto";
 import { v } from "convex/values";
 import { google } from "googleapis";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { runPipeline } from "./pipeline";
+import { checkFileHash } from "../lib/virustotal";
 
 function decodeBase64Url(data: string): string {
   return Buffer.from(data, "base64url").toString("utf-8");
@@ -20,8 +22,9 @@ function stripHtml(html: string): string {
 }
 
 interface GmailPart {
+  filename?: string | null;
   mimeType?: string | null;
-  body?: { data?: string | null } | null;
+  body?: { data?: string | null; attachmentId?: string | null } | null;
   parts?: GmailPart[] | null;
 }
 
@@ -37,6 +40,66 @@ function findBody(part: GmailPart | undefined, mimeType: string): string | null 
     }
   }
   return null;
+}
+
+interface AttachmentRef {
+  filename: string;
+  attachmentId: string;
+}
+
+function findAttachments(part: GmailPart | undefined, acc: AttachmentRef[] = []): AttachmentRef[] {
+  if (!part) return acc;
+  if (part.filename && part.body?.attachmentId) {
+    acc.push({ filename: part.filename, attachmentId: part.body.attachmentId });
+  }
+  if (part.parts) {
+    for (const child of part.parts) findAttachments(child, acc);
+  }
+  return acc;
+}
+
+const MAX_ATTACHMENTS_PER_MESSAGE = 3;
+
+interface AttachmentIntel {
+  filename: string;
+  sha256: string;
+  found: boolean;
+  vtMalicious: number;
+  vtSuspicious: number;
+}
+
+/** Hashes each attachment and checks the hash against VirusTotal — the file
+ *  content itself is never uploaded anywhere, only its SHA-256 digest. */
+async function scanAttachments(
+  gmail: ReturnType<typeof google.gmail>,
+  messageId: string,
+  payload: GmailPart | undefined
+): Promise<AttachmentIntel[]> {
+  const refs = findAttachments(payload).slice(0, MAX_ATTACHMENTS_PER_MESSAGE);
+  const results: AttachmentIntel[] = [];
+  for (const ref of refs) {
+    try {
+      const att = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId,
+        id: ref.attachmentId,
+      });
+      if (!att.data.data) continue;
+      const bytes = Buffer.from(att.data.data, "base64url");
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      const rep = await checkFileHash(sha256);
+      results.push({
+        filename: ref.filename,
+        sha256,
+        found: rep.found,
+        vtMalicious: rep.malicious,
+        vtSuspicious: rep.suspicious,
+      });
+    } catch {
+      // Skip this attachment on any failure — never block the rest of the scan over it.
+    }
+  }
+  return results;
 }
 
 function extractEmailContent(message: {
@@ -95,7 +158,22 @@ export const scanInbox = action({
       const { subject, body } = extractEmailContent(full.data);
       if (!body.trim()) continue;
 
-      const result = await runPipeline(`Subject: ${subject}\n\n${body}`);
+      // Skip the ~10-20s urlscan screenshot during bulk inbox scans — VT domain
+      // checks (fast, synchronous) still run for every message.
+      const result = await runPipeline(`Subject: ${subject}\n\n${body}`, {
+        captureScreenshot: false,
+      });
+
+      const attachmentIntel = await scanAttachments(gmail, m.id, full.data.payload ?? undefined);
+      const maliciousAttachment = attachmentIntel.find((a) => a.vtMalicious > 0);
+      if (maliciousAttachment) {
+        // A hash-confirmed malicious attachment overrides everything else — this
+        // isn't a judgment call the way a lookalike domain is, it's a direct hit.
+        result.verdict = "scam";
+        result.confidence = Math.max(result.confidence, 95);
+        result.signals = [...result.signals, { label: "Malicious Attachment", value: 100 }];
+      }
+
       await ctx.runMutation(internal.scanResults.insert, {
         ownerId,
         connectionId: connection._id,
@@ -111,6 +189,9 @@ export const scanInbox = action({
         flaggedPhrases: result.flaggedPhrases,
         signals: result.signals,
         aiReviewed: result.aiReviewed,
+        linkIntel: result.linkIntel,
+        screenshot: result.screenshot ?? undefined,
+        attachmentIntel: attachmentIntel.length ? attachmentIntel : undefined,
       });
       scanned++;
     }

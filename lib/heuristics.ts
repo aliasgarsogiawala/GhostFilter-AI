@@ -64,7 +64,7 @@ function levenshtein(a: string, b: string): number {
   return dp[a.length][b.length];
 }
 
-function hostnameOf(url: string): string | null {
+export function hostnameOf(url: string): string | null {
   try {
     return new URL(url).hostname.toLowerCase();
   } catch {

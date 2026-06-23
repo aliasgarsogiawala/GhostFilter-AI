@@ -4,9 +4,11 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { scoreMessage, ML_REVIEW_THRESHOLD } from "../lib/ml-classifier";
-import { analyzeLinks, type LinkFinding } from "../lib/heuristics";
+import { analyzeLinks, hostnameOf, type LinkFinding } from "../lib/heuristics";
 import { reviewWithGemini, type GeminiVerdict } from "../lib/gemini";
 import { detectPromptInjection, type InjectionFinding } from "../lib/promptInjection";
+import { checkDomainReputation } from "../lib/virustotal";
+import { scanAndCapture, type UrlscanResult } from "../lib/urlscan";
 
 const SIGNAL_LABELS = [
   "Urgency Language",
@@ -50,6 +52,13 @@ function baselineSignals(
   ];
 }
 
+export interface LinkIntel {
+  url: string;
+  domain: string;
+  vtMalicious: number;
+  vtSuspicious: number;
+}
+
 export interface PipelineResult {
   verdict: "safe" | "suspicious" | "scam";
   confidence: number;
@@ -59,6 +68,24 @@ export interface PipelineResult {
   flaggedPhrases: { phrase: string; reason: string; severity: "amber" | "red" }[];
   signals: { label: string; value: number }[];
   aiReviewed: boolean;
+  linkIntel: LinkIntel[];
+  screenshot: UrlscanResult | null;
+}
+
+/** Checks domain reputation for up to the first 2 links — cheap, synchronous, no polling. */
+async function gatherLinkIntel(links: LinkFinding[]): Promise<LinkIntel[]> {
+  const targets = links.slice(0, 2);
+  const results = await Promise.all(
+    targets.map(async (l) => {
+      const finalUrl = l.expanded?.finalUrl ?? l.url;
+      const domain = hostnameOf(finalUrl);
+      if (!domain) return null;
+      const rep = await checkDomainReputation(domain);
+      if (!rep) return null;
+      return { url: finalUrl, domain, vtMalicious: rep.malicious, vtSuspicious: rep.suspicious };
+    })
+  );
+  return results.filter((r): r is LinkIntel => r !== null);
 }
 
 /**
@@ -68,7 +95,11 @@ export interface PipelineResult {
  * ML_REVIEW_THRESHOLD or a deterministic heuristic already found something
  * concrete (lookalike domain, blocked link expansion) — caps AI cost.
  */
-export async function runPipeline(text: string): Promise<PipelineResult> {
+export async function runPipeline(
+  text: string,
+  opts: { captureScreenshot?: boolean } = {}
+): Promise<PipelineResult> {
+  const captureScreenshot = opts.captureScreenshot ?? true;
   const mlScore = scoreMessage(text);
   const links = await analyzeLinks(text);
   const injection = detectPromptInjection(text);
@@ -88,8 +119,17 @@ export async function runPipeline(text: string): Promise<PipelineResult> {
       flaggedPhrases: [],
       signals: baselineSignals(mlScore, links, lowerText, injection),
       aiReviewed: false,
+      linkIntel: [],
+      screenshot: null,
     };
   }
+
+  // Kick these off now so they run concurrently with the Gemini call below,
+  // instead of stacking latency on top of it.
+  const intelPromise = gatherLinkIntel(links);
+  const firstUrl = links[0]?.expanded?.finalUrl ?? links[0]?.url;
+  const screenshotPromise =
+    captureScreenshot && firstUrl ? scanAndCapture(firstUrl) : Promise.resolve(null);
 
   let ai: GeminiVerdict;
   try {
@@ -97,6 +137,7 @@ export async function runPipeline(text: string): Promise<PipelineResult> {
   } catch (err) {
     // Gemini failed (missing key, rate limit, network) — degrade to a heuristic-only
     // verdict instead of crashing the whole analysis.
+    const [linkIntel, screenshot] = await Promise.all([intelPromise, screenshotPromise]);
     return {
       verdict: injection.detected ? "scam" : hasHardHeuristicHit ? "suspicious" : mlScore >= 0.7 ? "scam" : "suspicious",
       confidence: Math.round(mlScore * 100),
@@ -108,8 +149,12 @@ export async function runPipeline(text: string): Promise<PipelineResult> {
       flaggedPhrases: [],
       signals: baselineSignals(mlScore, links, lowerText, injection),
       aiReviewed: false,
+      linkIntel,
+      screenshot,
     };
   }
+
+  const [linkIntel, screenshot] = await Promise.all([intelPromise, screenshotPromise]);
 
   let signals = ai.signals.length ? ai.signals : baselineSignals(mlScore, links, lowerText, injection);
   let verdict = ai.verdict;
@@ -133,6 +178,8 @@ export async function runPipeline(text: string): Promise<PipelineResult> {
     flaggedPhrases: ai.flaggedPhrases,
     signals,
     aiReviewed: true,
+    linkIntel,
+    screenshot,
   };
 }
 
@@ -152,6 +199,8 @@ export const analyzeMessage = action({
       flaggedPhrases: result.flaggedPhrases,
       signals: result.signals,
       aiReviewed: result.aiReviewed,
+      linkIntel: result.linkIntel,
+      screenshot: result.screenshot ?? undefined,
     });
     return { ...result, id };
   },

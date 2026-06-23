@@ -21,6 +21,10 @@ import {
   LoaderCircle,
   ChevronRight,
   Crosshair,
+  ExternalLink,
+  Image as ImageIcon,
+  Paperclip,
+  Database,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useOwnerId } from "@/lib/useOwnerId";
@@ -43,6 +47,9 @@ interface ScanResultDoc {
   flaggedPhrases: { phrase: string; reason: string; severity: "amber" | "red" }[];
   signals: { label: string; value: number }[];
   aiReviewed: boolean;
+  linkIntel?: { url: string; domain: string; vtMalicious: number; vtSuspicious: number }[];
+  screenshot?: { url: string; resultUrl: string; screenshotUrl: string; ready: boolean };
+  attachmentIntel?: { filename: string; sha256: string; found: boolean; vtMalicious: number; vtSuspicious: number }[];
 }
 
 function verdictTone(verdict: Verdict): Tone {
@@ -679,6 +686,74 @@ export default function GhostFilterDashboard() {
                     <p className="text-zinc-500">{f.reason}</p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selected && selected.linkIntel && selected.linkIntel.length > 0 && (
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                  <Database className="h-3 w-3" />
+                  Threat Intelligence
+                </span>
+                {selected.linkIntel.map((li, i) => {
+                  const flagged = li.vtMalicious > 0 || li.vtSuspicious > 0;
+                  return (
+                    <div key={i} className="flex items-center justify-between text-[11px]">
+                      <span className="truncate font-mono text-zinc-400">{li.domain}</span>
+                      <span className={`shrink-0 font-mono font-bold ${flagged ? "text-[#ef4060]" : "text-[#3eeec0]"}`}>
+                        {flagged ? `${li.vtMalicious + li.vtSuspicious} engines flagged` : "clean on VirusTotal"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {selected && selected.screenshot && (
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                  <ImageIcon className="h-3 w-3" />
+                  Sandboxed Page Preview
+                </span>
+                {selected.screenshot.ready ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable urlscan.io image
+                  <img
+                    src={selected.screenshot.screenshotUrl}
+                    alt="Sandboxed screenshot of the linked page"
+                    className="w-full rounded border-[1.5px] border-[#27272f]"
+                  />
+                ) : (
+                  <p className="text-[11px] text-zinc-600">Still rendering on urlscan.io — check the full report shortly.</p>
+                )}
+                <a
+                  href={selected.screenshot.resultUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 hover:text-[#3eeec0]"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Full urlscan.io report
+                </a>
+              </div>
+            )}
+
+            {selected && selected.attachmentIntel && selected.attachmentIntel.length > 0 && (
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                  <Paperclip className="h-3 w-3" />
+                  Attachment Scan
+                </span>
+                {selected.attachmentIntel.map((a, i) => {
+                  const malicious = a.vtMalicious > 0;
+                  return (
+                    <div key={i} className="flex items-center justify-between text-[11px]">
+                      <span className="truncate font-mono text-zinc-400">{a.filename}</span>
+                      <span className={`shrink-0 font-mono font-bold ${malicious ? "text-[#ef4060]" : "text-[#3eeec0]"}`}>
+                        {!a.found ? "unknown file" : malicious ? `${a.vtMalicious} engines flagged` : "clean on VirusTotal"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
