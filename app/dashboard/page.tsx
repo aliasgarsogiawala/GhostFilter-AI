@@ -18,7 +18,6 @@ import {
   FileSearch,
   ScanSearch,
   LoaderCircle,
-  ChevronRight,
   ExternalLink,
   Image as ImageIcon,
   Paperclip,
@@ -41,11 +40,14 @@ import {
   ArrowDownUp,
   Sparkles,
   Zap,
+  ChevronDown,
+  Home,
+  Settings2,
 } from "lucide-react";
 import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useOwnerId } from "@/lib/useOwnerId";
-import { useAppearance, useTheme, THEMES } from "@/lib/useTheme";
+import { useAppearance } from "@/lib/useTheme";
 import { buildHighlightSegments } from "@/lib/highlight";
 
 type Verdict = "safe" | "suspicious" | "scam";
@@ -81,6 +83,12 @@ function verdictTone(verdict: Verdict): Tone {
   if (verdict === "scam") return "critical";
   if (verdict === "suspicious") return "warn";
   return "clear";
+}
+
+function friendlyVerdict(verdict: Verdict): string {
+  if (verdict === "scam") return "Likely scam";
+  if (verdict === "suspicious") return "Be careful";
+  return "Looks safe";
 }
 
 function scamLikelihood(result: ScanResultDoc): number {
@@ -234,19 +242,19 @@ function ThreatGauge({
 
   return (
     <motion.div
-      className="risk-meter w-full max-w-[540px] overflow-hidden rounded-xl border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)]"
+      className="risk-meter w-full overflow-hidden rounded-xl border border-[var(--line-strong)] bg-[var(--panel)]"
       animate={{ borderColor: displayColor }}
       transition={{ duration: 0.6 }}
     >
       <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-          Scam likelihood
+          Risk level
         </span>
         <span
           className="rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
           style={{ borderColor: displayColor, color: displayColor }}
         >
-          {scanning ? "Analyzing" : riskLabel}
+          {scanning ? "Checking" : riskLabel}
         </span>
       </div>
       <div className="grid gap-5 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -259,7 +267,7 @@ function ThreatGauge({
             transition={{ duration: 1.1, repeat: Infinity }}
           >
             <LoaderCircle className="h-7 w-7 animate-spin" />
-            ANALYZING
+            CHECKING
           </motion.div>
         ) : (
           <div
@@ -270,7 +278,7 @@ function ThreatGauge({
             {hasResult && <span className="ml-2 text-2xl tracking-normal text-zinc-500">%</span>}
           </div>
         )}
-          <p className="mt-2 text-[12px] text-zinc-400">{scanning ? "Checking language, links, and sender signals…" : riskCopy}</p>
+          <p className="mt-2 text-[12px] text-zinc-400">{scanning ? "Looking for pressure tactics, unsafe links, and identity clues…" : riskCopy}</p>
         </div>
         {tone === "clear" ? (
           <ShieldCheck className="hidden h-12 w-12 sm:block" style={{ color: displayColor }} />
@@ -301,10 +309,7 @@ function ThreatGauge({
   );
 }
 
-// ----------------------------------------------------------------------------
-// Mouse-tracking 3D tilt wrapper — subtle, no gradients, just perspective.
-// ----------------------------------------------------------------------------
-
+// Mouse-tracking 3D tilt wrapper — subtle perspective without visual noise.
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const rawX = useMotionValue(0);
@@ -312,14 +317,16 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
   const rotateX = useSpring(rawX, { stiffness: 200, damping: 20 });
   const rotateY = useSpring(rawY, { stiffness: 200, damping: 20 });
 
-  function onMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+  function onMouseMove(event: React.MouseEvent<HTMLDivElement>) {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    rawY.set(px * 8);
-    rawX.set(py * -8);
+
+    const pointerX = (event.clientX - rect.left) / rect.width - 0.5;
+    const pointerY = (event.clientY - rect.top) / rect.height - 0.5;
+    rawY.set(pointerX * 8);
+    rawX.set(pointerY * -8);
   }
+
   function onMouseLeave() {
     rawX.set(0);
     rawY.set(0);
@@ -393,36 +400,16 @@ function GhostMark() {
 }
 
 function ThemeSwitcher() {
-  const [theme, setTheme] = useTheme();
   const [appearance, setAppearance] = useAppearance();
   return (
-    <div className="flex items-center gap-2">
-      <div className="hidden items-center gap-2 sm:flex" title="Color palette" role="group" aria-label="Color palette">
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTheme(t.id)}
-            aria-label={t.label}
-            aria-pressed={theme === t.id}
-            title={t.label}
-            className={`h-4 w-4 rounded-full border transition-transform hover:scale-110 ${
-              theme === t.id ? "border-[var(--text-primary)]" : "border-transparent"
-            }`}
-            style={{
-              backgroundColor: t.swatch,
-              boxShadow: theme === t.id ? `0 0 0 2px var(--ink), 0 0 0 3px ${t.swatch}` : undefined,
-            }}
-          />
-        ))}
-      </div>
+    <div>
       <button
         onClick={() => setAppearance(appearance === "dark" ? "light" : "dark")}
         aria-label={`Switch to ${appearance === "dark" ? "light" : "dark"} mode`}
         title={`Switch to ${appearance === "dark" ? "light" : "dark"} mode`}
-        className="flex h-9 items-center gap-2 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--input)] px-2.5 text-[10px] font-bold uppercase tracking-wide text-zinc-300 hover:border-[var(--accent)]"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--line-strong)] bg-[var(--panel)] text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
       >
         {appearance === "dark" ? <Sun className="h-3.5 w-3.5 text-[var(--warn)]" /> : <Moon className="h-3.5 w-3.5 text-[var(--info)]" />}
-        <span className="hidden md:inline">{appearance === "dark" ? "Light" : "Dark"}</span>
       </button>
     </div>
   );
@@ -699,40 +686,41 @@ export default function GhostFilterDashboard() {
   const segments = selected ? buildHighlightSegments(selected.snippet, selected.flaggedPhrases) : [];
 
   return (
-    <div className="bg-dot-grid min-h-screen w-full text-zinc-300">
-      <header className="relative z-10 flex flex-col gap-2 border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="dashboard-page min-h-screen w-full bg-[var(--ink)] text-zinc-300">
+      <header className="relative z-10 flex min-h-[68px] flex-col gap-2 border-b border-[var(--line)] bg-[var(--ink)] px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <GhostMark />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[17px] tracking-tight text-zinc-50">
+              <h1 className="text-[16px] tracking-tight text-zinc-50">
                 <span className="font-bold">Ghost</span>
                 <span className="font-light text-zinc-400">Filter</span>
-                <span className="ml-1 align-top text-[10px] font-bold text-[var(--accent)]">AI</span>
+                <span className="ml-1 align-top text-[9px] font-bold text-[var(--accent)]">AI</span>
               </h1>
-              <span className="rounded border-[1.5px] border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-                Scam &amp; Phishing Shield
-              </span>
-              <span className="rounded border-[1.5px] border-[#f5a623] bg-[#1a140a] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#f5a623]">
-                Beta
-              </span>
             </div>
             <p className="text-[11px] text-zinc-500">
-              Private, read-only scam detection for the messages you receive.
+              Check a message before you trust it.
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Suspense fallback={null}>
             <ConnectBanner />
           </Suspense>
           <ThemeSwitcher />
           <Link
+            href="/"
+            aria-label="Back to home"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--line-strong)] bg-[var(--panel)] text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            <Home className="h-4 w-4" />
+          </Link>
+          <Link
             href="/profile"
-            className="flex items-center gap-1.5 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)] px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-3 text-[11px] font-semibold text-zinc-400 hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             <BarChart3 className="h-3.5 w-3.5" />
-            Analytics
+            History insights
           </Link>
         </div>
       </header>
@@ -769,7 +757,7 @@ export default function GhostFilterDashboard() {
             }
             className={historyOpen ? "" : "lg:px-2"}
           >
-            <span className={historyOpen ? "" : "lg:hidden"}>Recent Scans</span>
+            <span className={historyOpen ? "" : "lg:hidden"}>Scan history</span>
           </SectionLabel>
           <AnimatePresence initial={false}>
             {historyOpen && (
@@ -785,15 +773,15 @@ export default function GhostFilterDashboard() {
                     <div className="mb-2 grid grid-cols-3 gap-1.5">
                       <div className="rounded-md border border-[var(--line)] bg-[var(--panel)] p-2">
                         <span className="block font-mono text-lg font-bold text-zinc-100">{threatCount}</span>
-                        <span className="text-[8px] font-bold uppercase tracking-wide text-zinc-500">Threats</span>
+                        <span className="text-[8px] font-bold uppercase tracking-wide text-zinc-500">Flagged</span>
                       </div>
                       <div className="rounded-md border border-[var(--line)] bg-[var(--panel)] p-2">
                         <span className="block font-mono text-lg font-bold text-[var(--warn)]">{threatRate}%</span>
-                        <span className="text-[8px] font-bold uppercase tracking-wide text-zinc-500">Threat rate</span>
+                        <span className="text-[8px] font-bold uppercase tracking-wide text-zinc-500">Flagged share</span>
                       </div>
                       <div className="rounded-md border border-[var(--line)] bg-[var(--panel)] p-2">
                         <span className="block font-mono text-lg font-bold text-[var(--info)]">{averageRisk}%</span>
-                        <span className="text-[8px] font-bold uppercase tracking-wide text-zinc-500">Avg risk</span>
+                        <span className="text-[8px] font-bold uppercase tracking-wide text-zinc-500">Avg score</span>
                       </div>
                     </div>
                     <div className="relative">
@@ -856,7 +844,7 @@ export default function GhostFilterDashboard() {
                       <button
                         onClick={() => setDeepReviewOnly((active) => !active)}
                         aria-pressed={deepReviewOnly}
-                        title="Show scans reviewed by the deep AI analysis"
+                        title="Show scans that received a more detailed review"
                         className={`flex h-8 items-center gap-1 rounded-md border px-2 text-[8px] font-bold uppercase tracking-wide ${
                           deepReviewOnly
                             ? "border-[var(--violet)] bg-[var(--input)] text-[var(--violet)]"
@@ -864,7 +852,7 @@ export default function GhostFilterDashboard() {
                         }`}
                       >
                         <Sparkles className="h-3 w-3" />
-                        Deep
+                        Detailed
                       </button>
                     </div>
                     <button
@@ -872,7 +860,7 @@ export default function GhostFilterDashboard() {
                       className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      New manual scan
+                      Check another message
                     </button>
                   </div>
                 )}
@@ -983,14 +971,16 @@ export default function GhostFilterDashboard() {
             historyOpen ? "lg:col-span-6" : "lg:col-span-8"
           }`}
         >
-          <SectionLabel
-            icon={Plug}
-            className="order-4"
-            trailing={<span className="text-[10px] text-zinc-600">Optional</span>}
-          >
-            Scan connected accounts
-          </SectionLabel>
-          <div className="order-5 flex flex-wrap gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-4">
+          <details className="group order-5 border-b border-[var(--line)] bg-[var(--panel)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5">
+              <span className="flex items-center gap-2">
+                <Plug className="h-4 w-4 text-[var(--accent)]" />
+                <span className="text-[12px] font-semibold text-zinc-300">Check connected sources</span>
+                <span className="text-[10px] text-zinc-600">Optional</span>
+              </span>
+              <ChevronDown className="h-4 w-4 text-zinc-600 transition-transform group-open:rotate-180" />
+            </summary>
+          <div className="flex flex-wrap gap-2 border-t border-[var(--line)] px-5 py-4">
             {/* Google (Gmail + Drive share one connection) */}
             {gmailConnection ? (
               <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] text-[var(--accent-bright)]">
@@ -1056,9 +1046,9 @@ export default function GhostFilterDashboard() {
           </div>
 
           {(gmailConnection || githubConnection) && (
-            <div className="order-6 flex flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-2.5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
-                Scan depth
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)] px-5 py-3">
+              <span className="text-[10px] font-semibold text-zinc-500">
+                Items to check
               </span>
               <div className="flex overflow-hidden rounded-md border-[1.5px] border-[var(--line)]">
                 {[10, 25, 50].map((n) => (
@@ -1075,21 +1065,21 @@ export default function GhostFilterDashboard() {
                   </button>
                 ))}
               </div>
-              <span className="text-[10px] text-zinc-600">most recent items per scan</span>
+              <span className="text-[10px] text-zinc-600">most recent</span>
             </div>
           )}
           {scanError && (
-            <p className="order-7 border-b-[1.5px] border-[var(--line)] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]" role="alert">
+            <p className="border-t border-[var(--line)] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]" role="alert">
               {scanError}
             </p>
           )}
+          </details>
 
           {/* Channels that can't be auto-connected (no API to read personal messages) —
               honest manual-paste path instead of fake "connect" buttons. */}
-          <div className="order-3 border-b-[1.5px] border-[var(--line)] px-5 py-3">
+          <div className="order-4 border-b border-[var(--line)] px-5 py-3">
             <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-              <span className="font-bold text-zinc-400">Can&apos;t be auto-connected.</span> Apps like these
-              don&apos;t let outside tools read your private chats — tap one and paste the message in.
+              Pasting from a chat app? Choose it below to personalize the prompt.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {MANUAL_CHANNELS.map((c) => {
@@ -1113,22 +1103,22 @@ export default function GhostFilterDashboard() {
             </div>
           </div>
 
-          <div className="order-1 border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-5 py-4">
+          <div className="order-1 border-b border-[var(--line)] bg-[var(--panel)] px-5 py-5">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]">
                 <WandSparkles className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-[15px] font-bold tracking-tight text-zinc-100">Check a suspicious message</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-                  Paste an email, text, or DM. You’ll get a risk verdict, the reasons behind it, and a safe next action.
+                <p className="text-[17px] font-semibold tracking-tight text-zinc-100">What would you like to check?</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+                  Paste the message exactly as you received it. We’ll explain anything that looks unsafe.
                 </p>
               </div>
             </div>
           </div>
           <div className="order-2">
           <SectionLabel icon={FileSearch}>
-            {sourceHint ? `Paste the ${sourceHint} message` : "Paste a Message to Analyze"}
+            {sourceHint ? `Paste from ${sourceHint}` : "Paste your message"}
           </SectionLabel>
           <div className="flex flex-col gap-2.5 border-b-[1.5px] border-[var(--line)] px-5 py-4">
             <textarea
@@ -1143,8 +1133,8 @@ export default function GhostFilterDashboard() {
               }}
               placeholder={
                 sourceHint
-                  ? `Paste the suspicious ${sourceHint} message here...`
-                  : "Paste a suspicious email, text message, or DM here..."
+                  ? `Paste the ${sourceHint} message here…`
+                  : "Paste an email, text, or direct message here…"
               }
               rows={5}
               aria-describedby="message-help"
@@ -1152,8 +1142,8 @@ export default function GhostFilterDashboard() {
             />
             <div className="flex items-start justify-between gap-3">
             <p id="message-help" className="text-[10px] leading-relaxed text-zinc-500">
-              Tip: paste a full email <span className="text-zinc-500">with headers</span> (Gmail → ⋮ → &ldquo;Show original&rdquo;) for deep header forensics — sender spoofing, Reply-To mismatches, SPF/DKIM/DMARC. Press{" "}
-              <span className="font-mono text-zinc-500">⌘/Ctrl + Enter</span> to analyze.
+              Include the sender and any links if possible. Press{" "}
+              <span className="font-mono text-zinc-500">⌘/Ctrl + Enter</span> to check.
             </p>
               <span className="shrink-0 font-mono text-[10px] text-zinc-600">{messageText.length.toLocaleString()} chars</span>
             </div>
@@ -1198,21 +1188,21 @@ export default function GhostFilterDashboard() {
                 style={!messageText.trim() || analyzing ? undefined : { boxShadow: "2.5px 2.5px 0 0 #0a4a3a" }}
               >
                 {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />}
-                {analyzing ? "Analyzing" : "Analyze"}
+                {analyzing ? "Checking" : "Check message"}
               </button>
             </div>
           </div>
           </div>
 
-          <div className="order-8 flex flex-col items-center border-b-[1.5px] border-[var(--line)] px-5 py-7" aria-live="polite">
+          <div className="order-3 flex flex-col items-center border-b border-[var(--line)] px-5 py-6" aria-live="polite">
             <TiltCard className="w-full [transform-style:preserve-3d]">
               <ThreatGauge value={gaugeValue} tone={tone} scanning={analyzing} hasResult={!!selected} />
             </TiltCard>
           </div>
 
-          <div className="relative order-9 flex flex-1 flex-col px-5 py-4">
+          <div className="relative order-6 flex flex-1 flex-col px-5 py-4">
             <span className="pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-              Analyzed Message
+              Message we checked
             </span>
             <div className="relative min-h-[120px] rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] p-4 font-mono text-[12.5px] leading-[1.8] text-zinc-400">
               {selected && <VerdictStamp verdict={selected.verdict} />}
@@ -1246,16 +1236,19 @@ export default function GhostFilterDashboard() {
             {/* PhishTool-style header forensics — shown when the analyzed item is a real email
                 (Gmail scan, or a pasted raw email with headers). */}
             {selected?.forensics && (
-              <div className="mt-4 rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)]">
-                <div className="flex items-center gap-2 border-b-[1.5px] border-[var(--line)] px-4 py-2.5">
+              <details className="group mt-4 rounded-md border border-[var(--line)] bg-[var(--input)]">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
+                  <span className="flex items-center gap-2">
                   <FileSearch className="h-3.5 w-3.5 text-[var(--accent)]" />
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400">
-                    Email Header Forensics
+                  <span className="text-[11px] font-semibold text-zinc-400">
+                    Technical email checks
                   </span>
-                </div>
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-zinc-600 transition-transform group-open:rotate-180" />
+                </summary>
 
                 {selected.forensics.indicators.length > 0 && (
-                  <div className="flex flex-col gap-2 border-b-[1.5px] border-[var(--line)] px-4 py-3">
+                  <div className="flex flex-col gap-2 border-t border-b border-[var(--line)] px-4 py-3">
                     {selected.forensics.indicators.map((ind, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <ShieldAlert
@@ -1298,7 +1291,7 @@ export default function GhostFilterDashboard() {
                     );
                   })}
                 </div>
-              </div>
+              </details>
             )}
           </div>
         </motion.section>
@@ -1310,13 +1303,12 @@ export default function GhostFilterDashboard() {
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.16 }}
           className="order-3 col-span-1 flex flex-col lg:col-span-3 lg:h-[calc(100vh-73px)] lg:overflow-y-auto"
         >
-          <SectionLabel icon={ShieldAlert}>Verdict</SectionLabel>
+          <SectionLabel icon={ShieldAlert}>Your result</SectionLabel>
           <div className="flex flex-col gap-4 px-4 py-4">
             <div
               className={`rounded-lg border-[1.5px] bg-[var(--panel)] px-4 py-4 ${
                 tone === "critical" ? "border-[#ef4060]" : "border-[var(--line)]"
               }`}
-              style={tone === "critical" ? { boxShadow: "3px 3px 0 0 #4a0a18" } : undefined}
             >
               <div className="flex items-center gap-2">
                 {tone === "clear" ? (
@@ -1324,16 +1316,16 @@ export default function GhostFilterDashboard() {
                 ) : (
                   <ShieldAlert className={`h-4 w-4 ${TONE_TEXT[tone]}`} />
                 )}
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Verdict</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Overall result</span>
               </div>
-              <div className={`mt-1.5 flex items-center gap-2 text-xl font-extrabold tracking-tight ${TONE_TEXT[tone]}`}>
+              <div className={`mt-2 flex items-center gap-2 text-2xl font-semibold tracking-tight ${TONE_TEXT[tone]}`}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TONE_HEX[tone] }} />
-                {selected ? selected.verdict.toUpperCase() : "—"}
+                {selected ? friendlyVerdict(selected.verdict) : "Waiting for a message"}
               </div>
               {selected && <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">{selected.summary}</p>}
               {!selected && (
                 <div className="mt-3 flex flex-col gap-2.5 border-t border-[var(--line)] pt-3">
-                  {["Plain-English verdict", "Why it was flagged", "Safest next action"].map((item) => (
+                  {["A clear result", "The reasons behind it", "What to do next"].map((item) => (
                     <div key={item} className="flex items-center gap-2 text-[11px] text-zinc-400">
                       <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent)]" />
                       {item}
@@ -1346,24 +1338,33 @@ export default function GhostFilterDashboard() {
             {selected && (
               <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-                  What to do
+                  What you should do
                 </span>
                 <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-300">{selected.recommendation}</p>
               </div>
             )}
 
-            <div className="flex flex-col gap-3 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+            <details className="group rounded-lg border border-[var(--line)] bg-[var(--panel)]">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5">
+                <span className="flex items-center gap-2 text-[11px] font-semibold text-zinc-400">
+                  <Settings2 className="h-4 w-4 text-zinc-500" />
+                  More details
+                </span>
+                <ChevronDown className="h-4 w-4 text-zinc-600 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="flex flex-col gap-3 border-t border-[var(--line)] p-3">
+            <div className="flex flex-col gap-3 rounded-lg border border-[var(--line)] bg-[var(--input)] px-3.5 py-3.5">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-                Signal Breakdown
+                Why we gave this result
               </span>
               {selected ? (
                 selected.signals.map((s) => <SignalBar key={s.label} label={s.label} value={s.value} />)
               ) : (
-                <p className="text-[11px] text-zinc-600">Analyze a message to see signal scores.</p>
+                <p className="text-[11px] text-zinc-600">Check a message to see the reasons behind the result.</p>
               )}
               {selected && !selected.aiReviewed && (
                 <p className="text-[10px] text-zinc-600">
-                  Fast triage only — this message didn&apos;t cross the threshold for a full AI review.
+                  This result was clear enough that an additional review was not needed.
                 </p>
               )}
             </div>
@@ -1371,7 +1372,7 @@ export default function GhostFilterDashboard() {
             {selected && selected.flaggedPhrases.length > 0 && (
               <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-                  Flagged Phrases
+                  Phrases to notice
                 </span>
                 {selected.flaggedPhrases.map((f, i) => (
                   <div key={i} className="text-[11px]">
@@ -1388,9 +1389,9 @@ export default function GhostFilterDashboard() {
               <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Database className="h-3 w-3" />
-                  Threat Intelligence
+                  Link safety checks
                   <span className="ml-auto font-mono text-[9px] font-normal normal-case tracking-normal text-zinc-600">
-                    VirusTotal · urlscan.io
+                    External safety databases
                   </span>
                 </span>
                 {selected.linkIntel && selected.linkIntel.length > 0 ? (
@@ -1407,7 +1408,7 @@ export default function GhostFilterDashboard() {
                   })
                 ) : (
                   <p className="text-[11px] text-zinc-600">
-                    No links found in this message to cross-check against threat databases.
+                    No links were found in this message.
                   </p>
                 )}
               </div>
@@ -1417,7 +1418,7 @@ export default function GhostFilterDashboard() {
               <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <ImageIcon className="h-3 w-3" />
-                  Sandboxed Page Preview
+                  Safe page preview
                 </span>
                 {/* Always attempt the image — urlscan renders it within ~15-20s, so it may not
                     be ready the instant the scan returns, but resolves shortly after (and on any
@@ -1453,7 +1454,7 @@ export default function GhostFilterDashboard() {
               <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Paperclip className="h-3 w-3" />
-                  Attachment Scan
+                  Attachment safety
                 </span>
                 {selected.attachmentIntel.map((a, i) => {
                   const malicious = a.vtMalicious > 0;
@@ -1468,13 +1469,12 @@ export default function GhostFilterDashboard() {
                 })}
               </div>
             )}
+              </div>
+            </details>
 
             <div className="flex items-center gap-2 px-1 text-[10px] text-zinc-600">
-              <ChevronRight className="h-3 w-3" />
-              <span>
-                Triage: hand-trained classifier · Deep review: Gemini
-                {selected && !selected.aiReviewed && " (not invoked)"}
-              </span>
+              <ShieldCheck className="h-3 w-3" />
+              <span>Automated checks provide guidance, not a guarantee.</span>
             </div>
 
             <p className="rounded-md border-[1.5px] border-[#f5a623]/40 bg-[#1a140a] px-3 py-2 text-[10px] leading-relaxed text-[#f5a623]">

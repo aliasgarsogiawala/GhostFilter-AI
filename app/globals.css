@@ -292,6 +292,44 @@ textarea:focus-visible {
   --text-secondary: #5f6d66;
 }
 
+.dashboard-page {
+  --ink: #111619;
+  --panel: #171d21;
+  --input: #1d252a;
+  --line: #293238;
+  --line-strong: #3a464d;
+  --accent: #72c9a9;
+  --accent-bright: #8ed9bc;
+  --accent-ink: #0c251c;
+  --accent-dim: #172a24;
+  --safe: #72c9a9;
+  --warn: #e4ae63;
+  --danger: #ed6b73;
+  --info: #77a7d8;
+  --violet: #a59acb;
+  --text-primary: #edf1ef;
+  --text-secondary: #9ba7a2;
+}
+
+[data-appearance="light"] .dashboard-page {
+  --ink: #f4f5f2;
+  --panel: #ffffff;
+  --input: #eef1ed;
+  --line: #dce1dc;
+  --line-strong: #c4ccc6;
+  --accent: #2f8064;
+  --accent-bright: #276d56;
+  --accent-ink: #ffffff;
+  --accent-dim: #e3f0ea;
+  --safe: #2f8064;
+  --warn: #9a651e;
+  --danger: #ba404c;
+  --info: #4777a8;
+  --violet: #706296;
+  --text-primary: #17201c;
+  --text-secondary: #5f6d66;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-splash {
     display: none;
