@@ -7,6 +7,10 @@ import { scoreMessage, ML_REVIEW_THRESHOLD } from "../lib/ml-classifier";
 import { analyzeLinks, hostnameOf, type LinkFinding } from "../lib/heuristics";
 import { reviewWithGemini, type GeminiVerdict } from "../lib/gemini";
 import { detectPromptInjection, type InjectionFinding } from "../lib/promptInjection";
+import {
+  detectSocialEngineering,
+  type SocialEngineeringFinding,
+} from "../lib/socialEngineering";
 import { checkDomainReputation } from "../lib/virustotal";
 import { scanAndCapture, type UrlscanResult } from "../lib/urlscan";
 import {
@@ -38,14 +42,16 @@ function baselineSignals(
   mlScore: number,
   links: LinkFinding[],
   lowerText: string,
-  injection: InjectionFinding
+  injection: InjectionFinding,
+  socialEngineering?: SocialEngineeringFinding
 ) {
   const urgencyHits = URGENCY_HINTS.filter((k) => lowerText.includes(k)).length;
   const lookalikeHit = links.some((l) => l.lookalike);
   const suspiciousLinkHit = links.some((l) => l.isShortened || l.lookalike || l.expanded?.blocked);
-  const credentialHit = ["password", "ssn", "social security", "card number", "cvv", "pin"].some(
-    (k) => lowerText.includes(k)
-  );
+  const credentialHit =
+    ["password", "ssn", "social security", "card number", "cvv", "pin"].some((k) =>
+      lowerText.includes(k)
+    ) || socialEngineering?.paymentRequest;
 
   return [
     { label: SIGNAL_LABELS[0], value: Math.min(100, urgencyHits * 30) },
@@ -109,6 +115,7 @@ export async function runPipeline(
   const mlScore = scoreMessage(text);
   const links = await analyzeLinks(text);
   const injection = detectPromptInjection(text);
+  const socialEngineering = detectSocialEngineering(text);
   const lowerText = text.toLowerCase();
 
   // Email header forensics: from Gmail-supplied raw headers, or auto-detected when a user
@@ -135,9 +142,11 @@ export async function runPipeline(
   const hasHardHeuristicHit =
     links.some((l) => l.lookalike || l.expanded?.blocked) ||
     injection.detected ||
+    socialEngineering.combinedImpersonationPayment ||
     linkFlagged ||
     forensicHardHit;
-  const shouldEscalate = mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit;
+  const shouldEscalate =
+    mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit || socialEngineering.paymentRequest;
 
   if (!shouldEscalate) {
     const screenshot = await screenshotPromise;
@@ -150,7 +159,7 @@ export async function runPipeline(
       recommendation:
         "This looks fine, but stay cautious with any unexpected request for money, codes, or personal info.",
       flaggedPhrases: [],
-      signals: baselineSignals(mlScore, links, lowerText, injection),
+      signals: baselineSignals(mlScore, links, lowerText, injection, socialEngineering),
       aiReviewed: false,
       linkIntel,
       screenshot,
@@ -160,7 +169,14 @@ export async function runPipeline(
 
   let ai: GeminiVerdict;
   try {
-    ai = await reviewWithGemini(text, mlScore, links, injection, forensics?.indicators ?? []);
+    ai = await reviewWithGemini(
+      text,
+      mlScore,
+      links,
+      injection,
+      forensics?.indicators ?? [],
+      socialEngineering
+    );
   } catch {
     // Gemini failed (missing key, rate limit, network) — degrade to a heuristic-only
     // verdict instead of crashing the whole analysis.
@@ -170,7 +186,12 @@ export async function runPipeline(
     // signals (prompt-injection or a threat-intel-flagged link) justify "scam" here; everything
     // else that was escalated is at most "suspicious".
     const fallbackVerdict: "suspicious" | "scam" =
-      injection.detected || linkFlagged || forensicHardHit ? "scam" : "suspicious";
+      injection.detected ||
+      socialEngineering.combinedImpersonationPayment ||
+      linkFlagged ||
+      forensicHardHit
+        ? "scam"
+        : "suspicious";
     return {
       verdict: fallbackVerdict,
       confidence: fallbackVerdict === "scam" ? Math.max(85, Math.round(mlScore * 100)) : 50,
@@ -180,8 +201,16 @@ export async function runPipeline(
           ? "Concrete fraud indicators were found, but full AI review was temporarily unavailable — treat this as a scam."
           : "Our AI reviewer was temporarily unavailable, so this is a cautious triage-only result, not a confirmed scam. Re-run the analysis in a moment for a full verdict.",
       recommendation: "Don't act on any request for money, passwords, or codes until you've verified it through an official channel you trust.",
-      flaggedPhrases: [],
-      signals: baselineSignals(mlScore, links, lowerText, injection),
+      flaggedPhrases: socialEngineering.combinedImpersonationPayment
+        ? [
+            {
+              phrase: socialEngineering.identityPhrase ?? "claim to be the real person",
+              reason: "The sender claims a trusted identity while asking for money.",
+              severity: "red",
+            },
+          ]
+        : [],
+      signals: baselineSignals(mlScore, links, lowerText, injection, socialEngineering),
       aiReviewed: false,
       linkIntel,
       screenshot,
@@ -191,26 +220,55 @@ export async function runPipeline(
 
   const screenshot = await screenshotPromise;
 
-  let signals = ai.signals.length ? ai.signals : baselineSignals(mlScore, links, lowerText, injection);
+  let signals = ai.signals.length
+    ? ai.signals
+    : baselineSignals(mlScore, links, lowerText, injection, socialEngineering);
   let verdict = ai.verdict;
+  let confidence = ai.confidence;
+  let summary = ai.summary;
+  let recommendation = ai.recommendation;
+  let flaggedPhrases = ai.flaggedPhrases;
   if (hasHardHeuristicHit) {
     // Don't let the model silently downplay a confirmed heuristic hit.
     signals = signals.map((s) => {
       if (s.label === SIGNAL_LABELS[1] && links.some((l) => l.lookalike)) return { ...s, value: Math.max(s.value, 90) };
+      if (s.label === SIGNAL_LABELS[4] && socialEngineering.paymentRequest) {
+        return { ...s, value: Math.max(s.value, 95) };
+      }
       if (s.label === SIGNAL_LABELS[5] && injection.detected) return { ...s, value: Math.max(s.value, 95) };
       return s;
     });
-    if (injection.detected) verdict = "scam";
+    if (socialEngineering.combinedImpersonationPayment) {
+      verdict = "scam";
+      confidence = Math.max(confidence, 90);
+      summary =
+        "This message asks for money while claiming to be the real identity of another person, a strong impersonation-scam pattern.";
+      recommendation =
+        "Do not send money. Verify the person through a separate, trusted contact method.";
+      if (
+        socialEngineering.identityPhrase &&
+        !flaggedPhrases.some((finding) => finding.phrase === socialEngineering.identityPhrase)
+      ) {
+        flaggedPhrases = [
+          ...flaggedPhrases,
+          {
+            phrase: socialEngineering.identityPhrase,
+            reason: "An unverified identity claim is paired with a request for money.",
+            severity: "red",
+          },
+        ];
+      }
+    } else if (injection.detected) verdict = "scam";
     else if (verdict === "safe") verdict = "suspicious";
   }
 
   return {
     verdict,
-    confidence: ai.confidence,
+    confidence,
     mlScore,
-    summary: ai.summary,
-    recommendation: ai.recommendation,
-    flaggedPhrases: ai.flaggedPhrases,
+    summary,
+    recommendation,
+    flaggedPhrases,
     signals,
     aiReviewed: true,
     linkIntel,

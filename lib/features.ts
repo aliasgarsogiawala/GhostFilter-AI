@@ -72,7 +72,11 @@ export function handcraftedFeatures(text: string): HandcraftedFeatures {
     exclamationCount: (text.match(/!/g) ?? []).length,
     digitRatio: digits / len,
     upperRatio: upper / len,
-    currencyCount: (text.match(/[$£€]/g) ?? []).length,
+    currencyCount: (
+      text.match(
+        /[$£€₹]|\b(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b/gi
+      ) ?? []
+    ).length,
     urgencyKeywordCount,
   };
 }

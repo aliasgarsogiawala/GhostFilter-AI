@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { LinkFinding } from "./heuristics";
 import type { InjectionFinding } from "./promptInjection";
+import type { SocialEngineeringFinding } from "./socialEngineering";
 
 const SYSTEM_INSTRUCTION = `You are GhostFilter, a consumer-protection scam/phishing analyst.
 
@@ -22,7 +23,11 @@ calls-to-action like "read more"/"check it out", an unsubscribe link, or a sense
 Only classify a message as "scam" when there are GENUINE fraud indicators: a request for
 passwords / payment / one-time codes / personal info; a lookalike or spoofed sender domain;
 a link whose real destination impersonates a known brand; threats of account loss to pressure
-immediate action on sensitive data; or links flagged by threat intelligence. A legitimate
+immediate action on sensitive data; links flagged by threat intelligence; or an unsolicited
+claim to be the "real" public figure/person paired with a request for money. Treat that last
+combination as a strong impersonation-scam indicator even when the message is short, informal,
+has no link, and asks for a small amount. A payment request by itself can be legitimate and
+must be judged in context. A legitimate
 newsletter or product update with no such indicators is "safe" — say so plainly. Use
 "suspicious" for genuinely ambiguous cases, not for ordinary marketing. When in doubt and there
 are no concrete fraud indicators, lean toward "safe".`;
@@ -85,7 +90,8 @@ export async function reviewWithGemini(
   mlScore: number,
   linkFindings: LinkFinding[],
   injection: InjectionFinding,
-  forensicIndicators: { label: string; detail: string }[] = []
+  forensicIndicators: { label: string; detail: string }[] = [],
+  socialEngineering?: SocialEngineeringFinding
 ): Promise<GeminiVerdict> {
   const heuristicNotes = linkFindings.length
     ? linkFindings
@@ -114,6 +120,21 @@ ${heuristicNotes}
 
 Prompt-injection scan:
 ${injectionNote}
+
+Social-engineering scan:
+${
+  socialEngineering?.combinedImpersonationPayment
+    ? `STRONG WARNING: the message combines a payment request (${JSON.stringify(
+        socialEngineering.paymentPhrase
+      )}) with a claim to be the "real" person (${JSON.stringify(
+        socialEngineering.identityPhrase
+      )}). Treat this as an impersonation-scam indicator.`
+    : socialEngineering?.paymentRequest
+      ? `A payment request was detected (${JSON.stringify(
+          socialEngineering.paymentPhrase
+        )}), but payment requests can be legitimate. Judge it in context.`
+      : "No explicit payment-request pattern detected."
+}
 
 Email header forensics:
 ${
