@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ShieldAlert, ShieldCheck, ScanSearch, Sparkles, Link2, Activity } from "lucide-react";
+import { ArrowLeft, ShieldAlert, ShieldCheck, ScanSearch, Sparkles, Link2, Activity, Moon, Sun } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useOwnerId } from "@/lib/useOwnerId";
-import { useTheme, THEMES } from "@/lib/useTheme";
+import { useAppearance, useTheme, THEMES } from "@/lib/useTheme";
 
 const VERDICT_COLOR: Record<string, string> = {
   safe: "var(--accent)",
@@ -16,16 +16,18 @@ const VERDICT_COLOR: Record<string, string> = {
 
 function ThemeSwitcher() {
   const [theme, setTheme] = useTheme();
+  const [appearance, setAppearance] = useAppearance();
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2">
       {THEMES.map((t) => (
         <button
           key={t.id}
           onClick={() => setTheme(t.id)}
           aria-label={t.label}
           title={t.label}
-          className={`h-3.5 w-3.5 rounded-full border transition-transform hover:scale-110 ${
-            theme === t.id ? "border-white/70" : "border-transparent"
+          aria-pressed={theme === t.id}
+          className={`hidden h-4 w-4 rounded-full border transition-transform hover:scale-110 sm:block ${
+            theme === t.id ? "border-[var(--text-primary)]" : "border-transparent"
           }`}
           style={{
             backgroundColor: t.swatch,
@@ -33,6 +35,14 @@ function ThemeSwitcher() {
           }}
         />
       ))}
+      <button
+        onClick={() => setAppearance(appearance === "dark" ? "light" : "dark")}
+        aria-label={`Switch to ${appearance === "dark" ? "light" : "dark"} mode`}
+        className="flex h-9 items-center gap-2 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--input)] px-2.5 text-[10px] font-bold uppercase text-zinc-300"
+      >
+        {appearance === "dark" ? <Sun className="h-3.5 w-3.5 text-[var(--warn)]" /> : <Moon className="h-3.5 w-3.5 text-[var(--info)]" />}
+        {appearance === "dark" ? "Light" : "Dark"}
+      </button>
     </div>
   );
 }

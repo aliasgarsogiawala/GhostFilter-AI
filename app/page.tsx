@@ -28,15 +28,26 @@ import {
   Send,
   Camera,
   Smartphone,
+  CheckCircle2,
+  LockKeyhole,
+  WandSparkles,
+  X,
+  Moon,
+  Sun,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Plus,
 } from "lucide-react";
 import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useOwnerId } from "@/lib/useOwnerId";
-import { useTheme, THEMES } from "@/lib/useTheme";
+import { useAppearance, useTheme, THEMES } from "@/lib/useTheme";
 import { buildHighlightSegments } from "@/lib/highlight";
 
 type Verdict = "safe" | "suspicious" | "scam";
 type Tone = "clear" | "warn" | "critical";
+type ScanFilter = "all" | Verdict;
 
 interface ScanResultDoc {
   _id: string;
@@ -158,109 +169,94 @@ function useAnimatedNumber(target: number, durationMs = 700) {
   return value;
 }
 
-function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
-  const a = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-}
-
-function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const start = polarToCartesian(cx, cy, r, endAngle);
-  const end = polarToCartesian(cx, cy, r, startAngle);
-  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-  return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 0, end.x, end.y].join(" ");
-}
-
-const GAUGE_START = -135;
-const GAUGE_END = 135;
-const GAUGE_SWEEP = GAUGE_END - GAUGE_START;
-const TICK_COUNT = 11;
-
-function ThreatGauge({ value, tone, scanning }: { value: number; tone: Tone; scanning?: boolean }) {
+function ThreatGauge({
+  value,
+  tone,
+  scanning,
+  hasResult,
+}: {
+  value: number;
+  tone: Tone;
+  scanning?: boolean;
+  hasResult: boolean;
+}) {
   const animated = useAnimatedNumber(value, 900);
-  const cx = 120;
-  const cy = 116;
-  const r = 92;
   const toneColor = TONE_HEX[tone];
-  // Glow intensifies with the displayed value — subtle at low risk, strong at high.
-  const glow = Math.min(0.55, 0.12 + (animated / 100) * 0.5);
-
-  const track = describeArc(cx, cy, r, GAUGE_START, GAUGE_END);
-  const needleAngle = GAUGE_START + (Math.min(100, animated) / 100) * GAUGE_SWEEP;
-
-  const ticks = Array.from({ length: TICK_COUNT }, (_, i) => {
-    const angle = GAUGE_START + (i / (TICK_COUNT - 1)) * GAUGE_SWEEP;
-    const inner = polarToCartesian(cx, cy, r - 10, angle);
-    const outer = polarToCartesian(cx, cy, r - 2, angle);
-    const frac = i / (TICK_COUNT - 1);
-    const lit = frac <= Math.min(100, animated) / 100;
-    return { inner, outer, lit };
-  });
+  const displayColor = hasResult || scanning ? toneColor : "var(--line-strong)";
+  const riskLabel = !hasResult ? "Awaiting scan" : animated >= 70 ? "High risk" : animated >= 35 ? "Needs caution" : "Low risk";
+  const riskCopy = !hasResult
+    ? "Run a scan to see a clear risk score."
+    : animated >= 70
+      ? "Strong scam or phishing signals detected."
+      : animated >= 35
+        ? "Some patterns deserve a closer look."
+        : "Few scam patterns were detected.";
+  const boundedValue = Math.min(100, Math.max(0, animated));
 
   return (
     <motion.div
-      className="relative flex flex-col items-center rounded-full border-[3px] border-[var(--line)] bg-[var(--panel)] p-3"
-      animate={{ boxShadow: `inset 0 0 0 1px #000, 0 10px 0 0 #00000080, 0 0 36px -8px color-mix(in srgb, ${toneColor} ${Math.round(glow * 100)}%, transparent)` }}
+      className="risk-meter w-full max-w-[540px] overflow-hidden rounded-xl border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)]"
+      animate={{ borderColor: displayColor }}
       transition={{ duration: 0.6 }}
     >
-      <svg viewBox="0 0 240 170" className="w-full max-w-[250px]">
-        <path d={track} fill="none" stroke="#23232b" strokeWidth={12} strokeLinecap="round" />
-        {ticks.map((t, i) => (
-          <line
-            key={i}
-            x1={t.inner.x}
-            y1={t.inner.y}
-            x2={t.outer.x}
-            y2={t.outer.y}
-            stroke={t.lit ? toneColor : "#3a3a45"}
-            strokeWidth={2}
-            opacity={t.lit ? 0.9 : 1}
-          />
-        ))}
-        {!scanning && (
-          <path
-            d={describeArc(cx, cy, r, GAUGE_START, needleAngle)}
-            fill="none"
-            stroke={toneColor}
-            strokeWidth={10}
-            strokeLinecap="round"
-          />
-        )}
-        {scanning && (
-          <motion.path
-            d={describeArc(cx, cy, r, GAUGE_START, GAUGE_START + GAUGE_SWEEP * 0.25)}
-            fill="none"
-            stroke={toneColor}
-            strokeWidth={10}
-            strokeLinecap="round"
-            style={{ originX: `${cx}px`, originY: `${cy}px` }}
-            animate={{ rotate: [0, 360] }}
-            transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
-          />
-        )}
-        <circle cx={cx} cy={cy} r={4} fill="#3a3a45" stroke="#000" strokeWidth={1} />
-      </svg>
-      <div className="absolute top-[54%] flex flex-col items-center">
+      <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+          Scam likelihood
+        </span>
+        <span
+          className="rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
+          style={{ borderColor: displayColor, color: displayColor }}
+        >
+          {scanning ? "Analyzing" : riskLabel}
+        </span>
+      </div>
+      <div className="grid gap-5 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
         {scanning ? (
-          <motion.span
-            className="font-mono text-2xl font-bold tracking-tight"
-            style={{ color: toneColor }}
+          <motion.div
+            className="flex h-[72px] items-center gap-3 font-mono text-2xl font-bold tracking-tight"
+            style={{ color: displayColor }}
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 1.1, repeat: Infinity }}
           >
-            SCANNING
-          </motion.span>
+            <LoaderCircle className="h-7 w-7 animate-spin" />
+            ANALYZING
+          </motion.div>
         ) : (
-          <span
-            className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-            style={{ color: toneColor }}
+          <div
+            className="font-mono text-[64px] font-bold leading-none tabular-nums tracking-[-0.08em] sm:text-[76px]"
+            style={{ color: displayColor }}
           >
-            {animated.toFixed(1)}
-            <span className="text-base text-zinc-500">%</span>
-          </span>
+            {hasResult ? Math.round(animated) : "—"}
+            {hasResult && <span className="ml-2 text-2xl tracking-normal text-zinc-500">%</span>}
+          </div>
         )}
-        <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-          Scam Likelihood
-        </span>
+          <p className="mt-2 text-[12px] text-zinc-400">{scanning ? "Checking language, links, and sender signals…" : riskCopy}</p>
+        </div>
+        {tone === "clear" ? (
+          <ShieldCheck className="hidden h-12 w-12 sm:block" style={{ color: displayColor }} />
+        ) : (
+          <ShieldAlert className="hidden h-12 w-12 sm:block" style={{ color: displayColor }} />
+        )}
+      </div>
+      <div className="px-5 pb-5">
+        <div className="relative h-3 overflow-hidden rounded-full bg-[var(--input)]">
+          <div className="absolute inset-y-0 left-0 w-[35%] bg-[var(--safe)]" />
+          <div className="absolute inset-y-0 left-[35%] w-[35%] bg-[var(--warn)]" />
+          <div className="absolute inset-y-0 left-[70%] right-0 bg-[var(--danger)]" />
+          {!scanning && hasResult && (
+            <motion.span
+              className="absolute top-1/2 h-5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--panel)] bg-[var(--text-primary)]"
+              animate={{ left: `${boundedValue}%` }}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            />
+          )}
+        </div>
+        <div className="mt-2 flex justify-between font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+          <span>Low</span>
+          <span>Caution</span>
+          <span>High</span>
+        </div>
       </div>
     </motion.div>
   );
@@ -359,23 +355,36 @@ function GhostMark() {
 
 function ThemeSwitcher() {
   const [theme, setTheme] = useTheme();
+  const [appearance, setAppearance] = useAppearance();
   return (
-    <div className="flex items-center gap-1.5" title="Accent theme">
-      {THEMES.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => setTheme(t.id)}
-          aria-label={t.label}
-          title={t.label}
-          className={`h-3.5 w-3.5 rounded-full border transition-transform hover:scale-110 ${
-            theme === t.id ? "border-white/70" : "border-transparent"
-          }`}
-          style={{
-            backgroundColor: t.swatch,
-            boxShadow: theme === t.id ? `0 0 0 2px var(--ink), 0 0 0 3px ${t.swatch}` : undefined,
-          }}
-        />
-      ))}
+    <div className="flex items-center gap-2">
+      <div className="hidden items-center gap-2 sm:flex" title="Color palette" role="group" aria-label="Color palette">
+        {THEMES.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTheme(t.id)}
+            aria-label={t.label}
+            aria-pressed={theme === t.id}
+            title={t.label}
+            className={`h-4 w-4 rounded-full border transition-transform hover:scale-110 ${
+              theme === t.id ? "border-[var(--text-primary)]" : "border-transparent"
+            }`}
+            style={{
+              backgroundColor: t.swatch,
+              boxShadow: theme === t.id ? `0 0 0 2px var(--ink), 0 0 0 3px ${t.swatch}` : undefined,
+            }}
+          />
+        ))}
+      </div>
+      <button
+        onClick={() => setAppearance(appearance === "dark" ? "light" : "dark")}
+        aria-label={`Switch to ${appearance === "dark" ? "light" : "dark"} mode`}
+        title={`Switch to ${appearance === "dark" ? "light" : "dark"} mode`}
+        className="flex h-9 items-center gap-2 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--input)] px-2.5 text-[10px] font-bold uppercase tracking-wide text-zinc-300 hover:border-[var(--accent)]"
+      >
+        {appearance === "dark" ? <Sun className="h-3.5 w-3.5 text-[var(--warn)]" /> : <Moon className="h-3.5 w-3.5 text-[var(--info)]" />}
+        <span className="hidden md:inline">{appearance === "dark" ? "Light" : "Dark"}</span>
+      </button>
     </div>
   );
 }
@@ -431,13 +440,15 @@ function SectionLabel({
   icon: Icon,
   children,
   trailing,
+  className = "",
 }: {
   icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
   trailing?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-4 py-3">
+    <div className={`flex items-center justify-between border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-4 py-3 ${className}`}>
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-[var(--accent)]" />
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">
@@ -527,20 +538,43 @@ export default function GhostFilterDashboard() {
   const [scanningKind, setScanningKind] = useState<"inbox" | "drive" | "github" | null>(null);
   const [scanDepth, setScanDepth] = useState(25);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sourceHint, setSourceHint] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyFilter, setHistoryFilter] = useState<ScanFilter>("all");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const gmailConnection = connections?.find((c) => c.provider === "gmail" && c.status === "connected");
   const githubConnection = connections?.find((c) => c.provider === "github" && c.status === "connected");
   const selected = scans?.find((s) => s._id === selectedId) ?? scans?.[0];
+  const scanCounts = {
+    all: scans?.length ?? 0,
+    safe: scans?.filter((scan) => scan.verdict === "safe").length ?? 0,
+    suspicious: scans?.filter((scan) => scan.verdict === "suspicious").length ?? 0,
+    scam: scans?.filter((scan) => scan.verdict === "scam").length ?? 0,
+  };
+  const visibleScans = scans?.filter((scan) => {
+    const matchesFilter = historyFilter === "all" || scan.verdict === historyFilter;
+    const query = historySearch.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      scan.subject?.toLowerCase().includes(query) ||
+      scan.snippet.toLowerCase().includes(query) ||
+      scan.provider.toLowerCase().includes(query);
+    return matchesFilter && matchesSearch;
+  });
 
   const analyzeText = async (text: string) => {
     if (!ownerId || !text.trim() || analyzing) return;
     setAnalyzing(true);
+    setAnalysisError(null);
     try {
       const result = await analyzeMessage({ text, ownerId });
       setSelectedId(result.id);
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "We couldn't analyze that message. Please try again.");
     } finally {
       setAnalyzing(false);
     }
@@ -550,6 +584,14 @@ export default function GhostFilterDashboard() {
 
   const pickChannel = (label: string) => {
     setSourceHint(label);
+    textareaRef.current?.focus();
+    textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const startNewScan = () => {
+    setMessageText("");
+    setSourceHint(null);
+    setAnalysisError(null);
     textareaRef.current?.focus();
     textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -603,7 +645,7 @@ export default function GhostFilterDashboard() {
               </span>
             </div>
             <p className="text-[11px] text-zinc-500">
-              Read-only access · we never send, delete, or modify your messages.
+              Private, read-only scam detection for the messages you receive.
             </p>
           </div>
         </div>
@@ -625,57 +667,164 @@ export default function GhostFilterDashboard() {
       <main className="relative z-10 grid grid-cols-1 lg:grid-cols-12">
         {/* ZONE A — Recent Scans */}
         <motion.section
+          id="recent-scans-sidebar"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="order-2 col-span-1 flex h-[360px] flex-col border-b-[1.5px] border-[var(--line)] lg:order-1 lg:col-span-3 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px]"
+          className={`order-2 col-span-1 flex flex-col border-b-[1.5px] border-[var(--line)] transition-[height] lg:order-1 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px] ${
+            historyOpen ? "h-[430px] lg:col-span-3" : "h-[49px] lg:col-span-1"
+          }`}
         >
           <SectionLabel
             icon={Inbox}
             trailing={
-              <span className="text-[10px] font-bold text-zinc-500">{scans?.length ?? 0} scanned</span>
+              <div className="flex items-center gap-2">
+                {historyOpen && (
+                  <span className="text-[10px] font-bold text-zinc-500">{scanCounts.all} scanned</span>
+                )}
+                <button
+                  onClick={() => setHistoryOpen((open) => !open)}
+                  aria-expanded={historyOpen}
+                  aria-controls="recent-scans-content"
+                  aria-label={historyOpen ? "Collapse recent scans sidebar" : "Expand recent scans sidebar"}
+                  title={historyOpen ? "Collapse recent scans" : "Expand recent scans"}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--line-strong)] bg-[var(--input)] text-zinc-400 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+                >
+                  {historyOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+                </button>
+              </div>
             }
+            className={historyOpen ? "" : "lg:px-2"}
           >
-            Recent Scans
+            <span className={historyOpen ? "" : "lg:hidden"}>Recent Scans</span>
           </SectionLabel>
-          <div className="flex-1 overflow-y-auto px-2 py-2">
-            {!scans?.length && (
-              <p className="px-2 py-4 text-[11px] text-zinc-600">
-                No scans yet — analyze a message or connect Gmail to get started.
-              </p>
-            )}
-            <AnimatePresence initial={false}>
-              {scans?.map((s) => {
-                const t = verdictTone(s.verdict);
-                const isSelected = selected?._id === s._id;
-                return (
-                  <motion.button
-                    key={s._id}
-                    layout
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setSelectedId(s._id)}
-                    className={`mb-1.5 flex w-full items-start gap-2.5 rounded-md border-l-[3px] bg-[var(--panel)] px-2.5 py-2 text-left text-[11px] hover:bg-[#181820] ${
-                      TONE_BORDER[t]
-                    } ${isSelected ? "ring-1 ring-[var(--line-strong)]" : ""}`}
-                  >
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-mono text-zinc-300">
-                        {s.subject || s.snippet}
-                      </span>
-                      <span className="font-mono text-[10px] text-zinc-600">
-                        {s.provider} · {new Date(s._creationTime).toLocaleTimeString()}
-                      </span>
+          <AnimatePresence initial={false}>
+            {historyOpen && (
+              <motion.div
+                id="recent-scans-content"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                {scanCounts.all > 0 && (
+                  <div className="border-b border-[var(--line)] p-2.5">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
+                      <input
+                        value={historySearch}
+                        onChange={(event) => setHistorySearch(event.target.value)}
+                        placeholder="Search scans…"
+                        aria-label="Search recent scans"
+                        className="h-9 w-full rounded-md border border-[var(--line)] bg-[var(--input)] pl-8 pr-3 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none"
+                      />
                     </div>
-                    <span className={`shrink-0 font-mono text-[10px] font-bold ${TONE_TEXT[t]}`}>
-                      {s.verdict.toUpperCase()}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </AnimatePresence>
-          </div>
+                    <div className="mt-2 grid grid-cols-4 gap-1" role="group" aria-label="Filter scans by verdict">
+                      {(["all", "safe", "suspicious", "scam"] as const).map((filter) => (
+                        <button
+                          key={filter}
+                          onClick={() => setHistoryFilter(filter)}
+                          aria-pressed={historyFilter === filter}
+                          className={`rounded border px-1 py-1.5 text-[8px] font-bold uppercase tracking-wide ${
+                            historyFilter === filter
+                              ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
+                              : "border-[var(--line)] text-zinc-500 hover:border-[var(--line-strong)] hover:text-zinc-300"
+                          }`}
+                        >
+                          {filter}
+                          <span className="ml-1 font-mono">{scanCounts[filter]}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={startNewScan}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      New manual scan
+                    </button>
+                  </div>
+                )}
+                <div className="flex-1 overflow-y-auto px-2 py-2">
+                  {!scans?.length && (
+                    <div className="mx-1 mt-1 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] p-4">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
+                        Your first scan
+                      </span>
+                      <p className="mt-2 text-[13px] font-semibold leading-snug text-zinc-200">
+                        Paste anything that feels off. GhostFilter turns it into a clear next step.
+                      </p>
+                      <div className="mt-4 flex flex-col gap-3">
+                        {[
+                          ["1", "Paste the message"],
+                          ["2", "Review the risk signals"],
+                          ["3", "Follow the safe action"],
+                        ].map(([step, label]) => (
+                          <div key={step} className="flex items-center gap-2.5 text-[11px] text-zinc-400">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--line-strong)] bg-[var(--input)] font-mono text-[10px] font-bold text-[var(--accent-bright)]">
+                              {step}
+                            </span>
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 flex items-start gap-2 border-t border-[var(--line)] pt-3 text-[10px] leading-relaxed text-zinc-500">
+                        <LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                        Pasted text is analyzed for you. Connected accounts remain read-only.
+                      </div>
+                    </div>
+                  )}
+                  {!!scans?.length && !visibleScans?.length && (
+                    <div className="px-3 py-8 text-center">
+                      <Search className="mx-auto h-5 w-5 text-zinc-700" />
+                      <p className="mt-2 text-[11px] text-zinc-500">No scans match this search.</p>
+                      <button
+                        onClick={() => {
+                          setHistorySearch("");
+                          setHistoryFilter("all");
+                        }}
+                        className="mt-2 text-[10px] font-bold text-[var(--accent-bright)] hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    </div>
+                  )}
+                  <AnimatePresence initial={false}>
+                    {visibleScans?.map((s) => {
+                      const t = verdictTone(s.verdict);
+                      const isSelected = selected?._id === s._id;
+                      return (
+                        <motion.button
+                          key={s._id}
+                          layout
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => setSelectedId(s._id)}
+                          aria-pressed={isSelected}
+                          className={`mb-1.5 flex w-full items-start gap-2.5 rounded-md border-l-[3px] bg-[var(--panel)] px-2.5 py-2 text-left text-[11px] hover:bg-[#181820] ${
+                            TONE_BORDER[t]
+                          } ${isSelected ? "ring-1 ring-[var(--line-strong)]" : ""}`}
+                        >
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate font-mono text-zinc-300">
+                              {s.subject || s.snippet}
+                            </span>
+                            <span className="font-mono text-[10px] text-zinc-600">
+                              {s.provider} · {new Date(s._creationTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          <span className={`shrink-0 font-mono text-[10px] font-bold ${TONE_TEXT[t]}`}>
+                            {s.verdict.toUpperCase()}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.section>
 
         {/* ZONE B — Analyzer */}
@@ -683,10 +832,18 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-          className="order-1 col-span-1 flex flex-col border-b-[1.5px] border-[var(--line)] lg:order-2 lg:col-span-6 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px]"
+          className={`order-1 col-span-1 flex flex-col border-b-[1.5px] border-[var(--line)] lg:order-2 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px] ${
+            historyOpen ? "lg:col-span-6" : "lg:col-span-8"
+          }`}
         >
-          <SectionLabel icon={Plug}>Connect Accounts</SectionLabel>
-          <div className="flex flex-wrap gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-4">
+          <SectionLabel
+            icon={Plug}
+            className="order-4"
+            trailing={<span className="text-[10px] text-zinc-600">Optional</span>}
+          >
+            Scan connected accounts
+          </SectionLabel>
+          <div className="order-5 flex flex-wrap gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-4">
             {/* Google (Gmail + Drive share one connection) */}
             {gmailConnection ? (
               <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] text-[var(--accent-bright)]">
@@ -752,7 +909,7 @@ export default function GhostFilterDashboard() {
           </div>
 
           {(gmailConnection || githubConnection) && (
-            <div className="flex flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-2.5">
+            <div className="order-6 flex flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-2.5">
               <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
                 Scan depth
               </span>
@@ -775,14 +932,14 @@ export default function GhostFilterDashboard() {
             </div>
           )}
           {scanError && (
-            <p className="border-b-[1.5px] border-[var(--line)] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]">
+            <p className="order-7 border-b-[1.5px] border-[var(--line)] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]" role="alert">
               {scanError}
             </p>
           )}
 
           {/* Channels that can't be auto-connected (no API to read personal messages) —
               honest manual-paste path instead of fake "connect" buttons. */}
-          <div className="border-b-[1.5px] border-[var(--line)] px-5 py-3">
+          <div className="order-3 border-b-[1.5px] border-[var(--line)] px-5 py-3">
             <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
               <span className="font-bold text-zinc-400">Can&apos;t be auto-connected.</span> Apps like these
               don&apos;t let outside tools read your private chats — tap one and paste the message in.
@@ -809,6 +966,20 @@ export default function GhostFilterDashboard() {
             </div>
           </div>
 
+          <div className="order-1 border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]">
+                <WandSparkles className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[15px] font-bold tracking-tight text-zinc-100">Check a suspicious message</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                  Paste an email, text, or DM. You’ll get a risk verdict, the reasons behind it, and a safe next action.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="order-2">
           <SectionLabel icon={FileSearch}>
             {sourceHint ? `Paste the ${sourceHint} message` : "Paste a Message to Analyze"}
           </SectionLabel>
@@ -828,13 +999,22 @@ export default function GhostFilterDashboard() {
                   ? `Paste the suspicious ${sourceHint} message here...`
                   : "Paste a suspicious email, text message, or DM here..."
               }
-              rows={4}
-              className="w-full resize-none rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] px-3 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none"
+              rows={5}
+              aria-describedby="message-help"
+              className="w-full resize-y rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] px-3.5 py-3 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/15"
             />
-            <p className="text-[10px] text-zinc-600">
+            <div className="flex items-start justify-between gap-3">
+            <p id="message-help" className="text-[10px] leading-relaxed text-zinc-500">
               Tip: paste a full email <span className="text-zinc-500">with headers</span> (Gmail → ⋮ → &ldquo;Show original&rdquo;) for deep header forensics — sender spoofing, Reply-To mismatches, SPF/DKIM/DMARC. Press{" "}
               <span className="font-mono text-zinc-500">⌘/Ctrl + Enter</span> to analyze.
             </p>
+              <span className="shrink-0 font-mono text-[10px] text-zinc-600">{messageText.length.toLocaleString()} chars</span>
+            </div>
+            {analysisError && (
+              <div className="rounded-md border border-[#ef4060]/60 bg-[#1a0c10] px-3 py-2 text-[11px] text-[#ef4060]" role="alert">
+                {analysisError}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-1.5">
               {EXAMPLES.map((ex) => (
                 <button
@@ -850,10 +1030,24 @@ export default function GhostFilterDashboard() {
                   {ex.label}
                 </button>
               ))}
+              {messageText && (
+                <button
+                  onClick={() => {
+                    setMessageText("");
+                    setSourceHint(null);
+                    setAnalysisError(null);
+                    textareaRef.current?.focus();
+                  }}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold text-zinc-500 hover:text-zinc-200"
+                >
+                  <X className="h-3 w-3" />
+                  Clear
+                </button>
+              )}
               <button
                 onClick={handleAnalyze}
                 disabled={!messageText.trim() || analyzing}
-                className="ml-auto flex items-center gap-1.5 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent)] px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[var(--accent-ink)] transition-all hover:bg-[var(--accent-bright)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[#1a1a22] disabled:text-zinc-600"
+                className="ml-auto flex min-h-10 items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent)] px-5 py-2 text-[12px] font-extrabold uppercase tracking-wide text-[var(--accent-ink)] transition-all hover:bg-[var(--accent-bright)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[#1a1a22] disabled:text-zinc-600"
                 style={!messageText.trim() || analyzing ? undefined : { boxShadow: "2.5px 2.5px 0 0 #0a4a3a" }}
               >
                 {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />}
@@ -861,14 +1055,15 @@ export default function GhostFilterDashboard() {
               </button>
             </div>
           </div>
+          </div>
 
-          <div className="flex flex-col items-center border-b-[1.5px] border-[var(--line)] px-6 py-7">
-            <TiltCard className="[transform-style:preserve-3d]">
-              <ThreatGauge value={gaugeValue} tone={tone} scanning={analyzing} />
+          <div className="order-8 flex flex-col items-center border-b-[1.5px] border-[var(--line)] px-5 py-7" aria-live="polite">
+            <TiltCard className="w-full [transform-style:preserve-3d]">
+              <ThreatGauge value={gaugeValue} tone={tone} scanning={analyzing} hasResult={!!selected} />
             </TiltCard>
           </div>
 
-          <div className="relative flex flex-1 flex-col px-5 py-4">
+          <div className="relative order-9 flex flex-1 flex-col px-5 py-4">
             <span className="pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
               Analyzed Message
             </span>
@@ -989,6 +1184,16 @@ export default function GhostFilterDashboard() {
                 {selected ? selected.verdict.toUpperCase() : "—"}
               </div>
               {selected && <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">{selected.summary}</p>}
+              {!selected && (
+                <div className="mt-3 flex flex-col gap-2.5 border-t border-[var(--line)] pt-3">
+                  {["Plain-English verdict", "Why it was flagged", "Safest next action"].map((item) => (
+                    <div key={item} className="flex items-center gap-2 text-[11px] text-zinc-400">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {selected && (
