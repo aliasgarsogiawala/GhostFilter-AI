@@ -7,6 +7,7 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { runPipeline } from "./pipeline";
 import { checkFileHash } from "../lib/virustotal";
+import { rawHeadersFromList } from "../lib/emailHeaders";
 
 function decodeBase64Url(data: string): string {
   return Buffer.from(data, "base64url").toString("utf-8");
@@ -120,8 +121,9 @@ function extractEmailContent(message: {
 const MAX_MESSAGES = 50;
 
 export const scanInbox = action({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+    const max = Math.min(MAX_MESSAGES, Math.max(1, limit ?? 25));
     const connection = await ctx.runQuery(internal.connections.getActiveGmail, { ownerId });
     if (!connection) {
       throw new Error("No connected Gmail account for this session");
@@ -139,7 +141,7 @@ export const scanInbox = action({
 
     const list = await gmail.users.messages.list({
       userId: "me",
-      maxResults: MAX_MESSAGES,
+      maxResults: max,
       q: "in:inbox",
     });
     const messages = list.data.messages ?? [];
@@ -158,10 +160,14 @@ export const scanInbox = action({
       const { subject, body } = extractEmailContent(full.data);
       if (!body.trim()) continue;
 
+      const headerList = (full.data.payload as { headers?: { name?: string | null; value?: string | null }[] })?.headers ?? [];
+
       // Skip the ~10-20s urlscan screenshot during bulk inbox scans — VT domain
-      // checks (fast, synchronous) still run for every message.
+      // checks (fast, synchronous) still run for every message. Real headers power the
+      // PhishTool-style forensics (Reply-To / Return-Path / SPF-DKIM-DMARC spoofing checks).
       const result = await runPipeline(`Subject: ${subject}\n\n${body}`, {
         captureScreenshot: false,
+        rawHeaders: rawHeadersFromList(headerList),
       });
 
       const attachmentIntel = await scanAttachments(gmail, m.id, full.data.payload ?? undefined);
@@ -192,6 +198,7 @@ export const scanInbox = action({
         linkIntel: result.linkIntel,
         screenshot: result.screenshot ?? undefined,
         attachmentIntel: attachmentIntel.length ? attachmentIntel : undefined,
+        forensics: result.forensics ?? undefined,
       });
       scanned++;
     }

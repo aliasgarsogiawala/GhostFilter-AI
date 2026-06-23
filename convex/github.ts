@@ -15,14 +15,15 @@ interface GithubNotification {
 const MAX_NOTIFICATIONS = 50;
 
 export const scanNotifications = action({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+    const max = Math.min(MAX_NOTIFICATIONS, Math.max(1, limit ?? 25));
     const connection = await ctx.runQuery(internal.connections.getActiveGithub, { ownerId });
     if (!connection) {
       throw new Error("No connected GitHub account for this session");
     }
 
-    const res = await fetch(`https://api.github.com/notifications?all=true&per_page=${MAX_NOTIFICATIONS}`, {
+    const res = await fetch(`https://api.github.com/notifications?all=true&per_page=${max}`, {
       headers: {
         Authorization: `Bearer ${connection.accessToken}`,
         Accept: "application/vnd.github+json",

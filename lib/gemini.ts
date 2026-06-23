@@ -84,7 +84,8 @@ export async function reviewWithGemini(
   text: string,
   mlScore: number,
   linkFindings: LinkFinding[],
-  injection: InjectionFinding
+  injection: InjectionFinding,
+  forensicIndicators: { label: string; detail: string }[] = []
 ): Promise<GeminiVerdict> {
   const heuristicNotes = linkFindings.length
     ? linkFindings
@@ -113,6 +114,13 @@ ${heuristicNotes}
 
 Prompt-injection scan:
 ${injectionNote}
+
+Email header forensics:
+${
+  forensicIndicators.length
+    ? forensicIndicators.map((i) => `- ${i.label}: ${i.detail}`).join("\n")
+    : "No email header spoofing indicators (or not an email with headers)."
+}
 
 Message to analyze:
 """

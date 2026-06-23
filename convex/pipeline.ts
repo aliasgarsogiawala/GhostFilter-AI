@@ -9,6 +9,11 @@ import { reviewWithGemini, type GeminiVerdict } from "../lib/gemini";
 import { detectPromptInjection, type InjectionFinding } from "../lib/promptInjection";
 import { checkDomainReputation } from "../lib/virustotal";
 import { scanAndCapture, type UrlscanResult } from "../lib/urlscan";
+import {
+  looksLikeRawEmail,
+  parseEmailForensics,
+  type EmailForensics,
+} from "../lib/emailHeaders";
 
 const SIGNAL_LABELS = [
   "Urgency Language",
@@ -70,6 +75,7 @@ export interface PipelineResult {
   aiReviewed: boolean;
   linkIntel: LinkIntel[];
   screenshot: UrlscanResult | null;
+  forensics: EmailForensics | null;
 }
 
 /** Checks domain reputation for up to the first 2 links — cheap, synchronous, no polling. */
@@ -97,17 +103,44 @@ async function gatherLinkIntel(links: LinkFinding[]): Promise<LinkIntel[]> {
  */
 export async function runPipeline(
   text: string,
-  opts: { captureScreenshot?: boolean } = {}
+  opts: { captureScreenshot?: boolean; rawHeaders?: string } = {}
 ): Promise<PipelineResult> {
   const captureScreenshot = opts.captureScreenshot ?? true;
   const mlScore = scoreMessage(text);
   const links = await analyzeLinks(text);
   const injection = detectPromptInjection(text);
-  const hasHardHeuristicHit = links.some((l) => l.lookalike || l.expanded?.blocked) || injection.detected;
-  const shouldEscalate = mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit;
   const lowerText = text.toLowerCase();
 
+  // Email header forensics: from Gmail-supplied raw headers, or auto-detected when a user
+  // pastes a full raw email. Spoofing indicators (Reply-To / Return-Path / auth mismatches)
+  // are strong, deterministic fraud signals.
+  const forensics: EmailForensics | null = opts.rawHeaders
+    ? parseEmailForensics(opts.rawHeaders)
+    : looksLikeRawEmail(text)
+    ? parseEmailForensics(text)
+    : null;
+  const forensicHardHit = !!forensics?.indicators.some((i) => i.severity === "red");
+
+  // Threat-intel runs whenever the message has links — it's independent of the ML score, so
+  // links get a real VirusTotal reputation check (and, for single manual scans, a urlscan.io
+  // sandbox screenshot) even when the text itself looks benign. A VT-flagged link then forces
+  // escalation to the AI reviewer.
+  const firstUrl = links[0]?.expanded?.finalUrl ?? links[0]?.url;
+  const intelPromise = links.length ? gatherLinkIntel(links) : Promise.resolve([] as LinkIntel[]);
+  const screenshotPromise =
+    captureScreenshot && firstUrl ? scanAndCapture(firstUrl) : Promise.resolve(null);
+
+  const linkIntel = await intelPromise;
+  const linkFlagged = linkIntel.some((li) => li.vtMalicious > 0 || li.vtSuspicious > 0);
+  const hasHardHeuristicHit =
+    links.some((l) => l.lookalike || l.expanded?.blocked) ||
+    injection.detected ||
+    linkFlagged ||
+    forensicHardHit;
+  const shouldEscalate = mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit;
+
   if (!shouldEscalate) {
+    const screenshot = await screenshotPromise;
     return {
       verdict: "safe",
       confidence: Math.round((1 - mlScore) * 100),
@@ -119,32 +152,25 @@ export async function runPipeline(
       flaggedPhrases: [],
       signals: baselineSignals(mlScore, links, lowerText, injection),
       aiReviewed: false,
-      linkIntel: [],
-      screenshot: null,
+      linkIntel,
+      screenshot,
+      forensics,
     };
   }
 
-  // Kick these off now so they run concurrently with the Gemini call below,
-  // instead of stacking latency on top of it.
-  const intelPromise = gatherLinkIntel(links);
-  const firstUrl = links[0]?.expanded?.finalUrl ?? links[0]?.url;
-  const screenshotPromise =
-    captureScreenshot && firstUrl ? scanAndCapture(firstUrl) : Promise.resolve(null);
-
   let ai: GeminiVerdict;
   try {
-    ai = await reviewWithGemini(text, mlScore, links, injection);
+    ai = await reviewWithGemini(text, mlScore, links, injection, forensics?.indicators ?? []);
   } catch {
     // Gemini failed (missing key, rate limit, network) — degrade to a heuristic-only
     // verdict instead of crashing the whole analysis.
-    const [linkIntel, screenshot] = await Promise.all([intelPromise, screenshotPromise]);
+    const screenshot = await screenshotPromise;
     // Without the AI reviewer we MUST NOT call something a "scam" off the SMS-trained
     // triage score alone — that's what flags legitimate newsletters. Only hard, corroborated
     // signals (prompt-injection or a threat-intel-flagged link) justify "scam" here; everything
     // else that was escalated is at most "suspicious".
-    const linkFlaggedByIntel = linkIntel.some((li) => li.vtMalicious > 0 || li.vtSuspicious > 0);
     const fallbackVerdict: "suspicious" | "scam" =
-      injection.detected || linkFlaggedByIntel ? "scam" : "suspicious";
+      injection.detected || linkFlagged || forensicHardHit ? "scam" : "suspicious";
     return {
       verdict: fallbackVerdict,
       confidence: fallbackVerdict === "scam" ? Math.max(85, Math.round(mlScore * 100)) : 50,
@@ -159,10 +185,11 @@ export async function runPipeline(
       aiReviewed: false,
       linkIntel,
       screenshot,
+      forensics,
     };
   }
 
-  const [linkIntel, screenshot] = await Promise.all([intelPromise, screenshotPromise]);
+  const screenshot = await screenshotPromise;
 
   let signals = ai.signals.length ? ai.signals : baselineSignals(mlScore, links, lowerText, injection);
   let verdict = ai.verdict;
@@ -188,6 +215,7 @@ export async function runPipeline(
     aiReviewed: true,
     linkIntel,
     screenshot,
+    forensics,
   };
 }
 
@@ -209,6 +237,7 @@ export const analyzeMessage = action({
       aiReviewed: result.aiReviewed,
       linkIntel: result.linkIntel,
       screenshot: result.screenshot ?? undefined,
+      forensics: result.forensics ?? undefined,
     });
     return { ...result, id };
   },

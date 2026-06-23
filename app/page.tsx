@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion";
@@ -28,8 +29,10 @@ import {
   Camera,
   Smartphone,
 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useOwnerId } from "@/lib/useOwnerId";
+import { useTheme, THEMES } from "@/lib/useTheme";
 import { buildHighlightSegments } from "@/lib/highlight";
 
 type Verdict = "safe" | "suspicious" | "scam";
@@ -52,6 +55,10 @@ interface ScanResultDoc {
   linkIntel?: { url: string; domain: string; vtMalicious: number; vtSuspicious: number }[];
   screenshot?: { url: string; resultUrl: string; screenshotUrl: string; uuid: string; ready: boolean };
   attachmentIntel?: { filename: string; sha256: string; found: boolean; vtMalicious: number; vtSuspicious: number }[];
+  forensics?: {
+    fields: { label: string; value: string; status?: "ok" | "warn" | "bad" }[];
+    indicators: { label: string; detail: string; severity: "amber" | "red" }[];
+  };
 }
 
 function verdictTone(verdict: Verdict): Tone {
@@ -65,25 +72,25 @@ function scamLikelihood(result: ScanResultDoc): number {
 }
 
 const TONE_HEX: Record<Tone, string> = {
-  clear: "#1fe3ad",
+  clear: "var(--accent)",
   warn: "#f5a623",
   critical: "#ef4060",
 };
 
 const TONE_BORDER: Record<Tone, string> = {
-  clear: "border-[#1fe3ad]",
+  clear: "border-[var(--accent)]",
   warn: "border-[#f5a623]",
   critical: "border-[#ef4060]",
 };
 
 const TONE_TEXT: Record<Tone, string> = {
-  clear: "text-[#3eeec0]",
+  clear: "text-[var(--accent-bright)]",
   warn: "text-[#f5a623]",
   critical: "text-[#ef4060]",
 };
 
 const STAMP_CONFIG: Record<Verdict, { label: string; hex: string }> = {
-  safe: { label: "VERIFIED SAFE", hex: "#1fe3ad" },
+  safe: { label: "VERIFIED SAFE", hex: "var(--accent)" },
   suspicious: { label: "SUSPICIOUS", hex: "#f5a623" },
   scam: { label: "CONFIRMED SCAM", hex: "#ef4060" },
 };
@@ -100,6 +107,10 @@ const EXAMPLES = [
   {
     label: "Fake prize/lottery",
     text: "CONGRATULATIONS! You've been selected to receive a $750 Walmart gift card. Claim your prize now before it expires: bit.ly/claim-prize-750",
+  },
+  {
+    label: "Live link scan",
+    text: "Your account needs verification. Please review your details at https://example.com/login to keep your account active.",
   },
   {
     label: "A normal text",
@@ -187,8 +198,8 @@ function ThreatGauge({ value, tone, scanning }: { value: number; tone: Tone; sca
 
   return (
     <motion.div
-      className="relative flex flex-col items-center rounded-full border-[3px] border-[#27272f] bg-[#101015] p-3"
-      animate={{ boxShadow: `inset 0 0 0 1px #000, 0 10px 0 0 #00000080, 0 0 36px -8px ${toneColor}${Math.round(glow * 255).toString(16).padStart(2, "0")}` }}
+      className="relative flex flex-col items-center rounded-full border-[3px] border-[var(--line)] bg-[var(--panel)] p-3"
+      animate={{ boxShadow: `inset 0 0 0 1px #000, 0 10px 0 0 #00000080, 0 0 36px -8px color-mix(in srgb, ${toneColor} ${Math.round(glow * 100)}%, transparent)` }}
       transition={{ duration: 0.6 }}
     >
       <svg viewBox="0 0 240 170" className="w-full max-w-[250px]">
@@ -300,7 +311,7 @@ function SignalBar({ label, value }: { label: string; value: number }) {
         <span className="text-zinc-400">{label}</span>
         <span className="font-mono font-bold text-zinc-300">{Math.round(value)}%</span>
       </div>
-      <div className="h-[7px] w-full overflow-hidden rounded-sm border border-[#27272f] bg-[#0e0e12]">
+      <div className="h-[7px] w-full overflow-hidden rounded-sm border border-[var(--line)] bg-[var(--input)]">
         <motion.div
           className="h-full rounded-sm"
           style={{ backgroundColor: barColor }}
@@ -318,23 +329,23 @@ function SignalBar({ label, value }: { label: string; value: number }) {
 function GhostMark() {
   return (
     <div
-      className="relative flex h-9 w-9 items-center justify-center rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c0c10]"
-      style={{ boxShadow: "2px 2px 0 0 #1fe3ad" }}
+      className="relative flex h-9 w-9 items-center justify-center rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--ink)]"
+      style={{ boxShadow: "2px 2px 0 0 var(--accent)" }}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path
           d="M12 2.5 L19.5 5.5 V11 C19.5 15.8 16.2 19.2 12 21.5 C7.8 19.2 4.5 15.8 4.5 11 V5.5 Z"
-          stroke="#1fe3ad"
+          stroke="var(--accent)"
           strokeWidth="1.6"
           strokeLinejoin="round"
         />
-        <circle cx="12" cy="11" r="1.5" fill="#1fe3ad" />
+        <circle cx="12" cy="11" r="1.5" fill="var(--accent)" />
         <motion.line
           x1="6.6"
           x2="17.4"
           y1={7}
           y2={7}
-          stroke="#1fe3ad"
+          stroke="var(--accent)"
           strokeWidth="1.4"
           strokeLinecap="round"
           initial={{ y1: 7, y2: 7, opacity: 0.35 }}
@@ -342,6 +353,29 @@ function GhostMark() {
           transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
         />
       </svg>
+    </div>
+  );
+}
+
+function ThemeSwitcher() {
+  const [theme, setTheme] = useTheme();
+  return (
+    <div className="flex items-center gap-1.5" title="Accent theme">
+      {THEMES.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setTheme(t.id)}
+          aria-label={t.label}
+          title={t.label}
+          className={`h-3.5 w-3.5 rounded-full border transition-transform hover:scale-110 ${
+            theme === t.id ? "border-white/70" : "border-transparent"
+          }`}
+          style={{
+            backgroundColor: t.swatch,
+            boxShadow: theme === t.id ? `0 0 0 2px var(--ink), 0 0 0 3px ${t.swatch}` : undefined,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -361,7 +395,7 @@ function ScanButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-1 rounded border-[1.5px] border-[#1fe3ad] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-[#1fe3ad] hover:text-[#06231c] disabled:opacity-50"
+      className="flex items-center gap-1 rounded border-[1.5px] border-[var(--accent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-[var(--accent)] hover:text-[var(--accent-ink)] disabled:opacity-50"
     >
       {busy ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Scan className="h-3 w-3" />}
       {label}
@@ -383,12 +417,12 @@ function ConnectButton({
   return (
     <a
       href={href}
-      className="group flex items-center gap-2 rounded-md border-[1.5px] border-[#34343e] bg-[#121217] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[#1fe3ad]"
+      className="group flex items-center gap-2 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)]"
       style={{ boxShadow: "2px 2px 0 0 #000" }}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
-      {sub && <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-600 group-hover:text-[#3eeec0]">{sub}</span>}
+      {sub && <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-600 group-hover:text-[var(--accent-bright)]">{sub}</span>}
     </a>
   );
 }
@@ -403,9 +437,9 @@ function SectionLabel({
   trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between border-b-[1.5px] border-[#27272f] bg-[#121217] px-4 py-3">
+    <div className="flex items-center justify-between border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-4 py-3">
       <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-[#1fe3ad]" />
+        <Icon className="h-3.5 w-3.5 text-[var(--accent)]" />
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">
           {children}
         </span>
@@ -436,7 +470,7 @@ function ConnectBanner() {
           exit={{ opacity: 0 }}
           className={`rounded-md border-[1.5px] px-3 py-1.5 text-[11px] font-semibold ${
             banner === "success"
-              ? "border-[#1fe3ad] bg-[#0c1a16] text-[#3eeec0]"
+              ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
               : "border-[#ef4060] bg-[#1a0c10] text-[#ef4060]"
           }`}
         >
@@ -458,7 +492,7 @@ function VerdictStamp({ verdict }: { verdict: Verdict }) {
       className="float-right -mr-1 -mt-1 mb-2 ml-3 select-none"
     >
       <div
-        className="rounded-md border-[3px] bg-[#0c0c10] px-3 py-1 font-mono text-[12px] font-extrabold uppercase tracking-[0.1em]"
+        className="rounded-md border-[3px] bg-[var(--ink)] px-3 py-1 font-mono text-[12px] font-extrabold uppercase tracking-[0.1em]"
         style={{
           borderColor: cfg.hex,
           color: cfg.hex,
@@ -491,6 +525,7 @@ export default function GhostFilterDashboard() {
   const [messageText, setMessageText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [scanningKind, setScanningKind] = useState<"inbox" | "drive" | "github" | null>(null);
+  const [scanDepth, setScanDepth] = useState(25);
   const [scanError, setScanError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sourceHint, setSourceHint] = useState<string | null>(null);
@@ -524,9 +559,9 @@ export default function GhostFilterDashboard() {
     setScanningKind(kind);
     setScanError(null);
     try {
-      if (kind === "inbox") await scanInbox({ ownerId });
-      else if (kind === "drive") await scanDrive({ ownerId });
-      else await scanGithub({ ownerId });
+      if (kind === "inbox") await scanInbox({ ownerId, limit: scanDepth });
+      else if (kind === "drive") await scanDrive({ ownerId, limit: scanDepth });
+      else await scanGithub({ ownerId, limit: scanDepth });
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Scan failed");
     } finally {
@@ -534,9 +569,13 @@ export default function GhostFilterDashboard() {
     }
   };
 
-  const handleDisconnect = async (id?: string) => {
+  const handleDisconnect = async (id?: string, providerLabel = "this account") => {
     const target = id ?? gmailConnection?._id;
     if (!ownerId || !target) return;
+    const ok = window.confirm(
+      `Disconnect ${providerLabel}?\n\nGhostFilter will lose access and stop scanning it. You'll need to reconnect (and re-authorize) before you can scan again.`
+    );
+    if (!ok) return;
     await disconnect({ connectionId: target as never, ownerId });
   };
 
@@ -546,7 +585,7 @@ export default function GhostFilterDashboard() {
 
   return (
     <div className="bg-dot-grid min-h-screen w-full text-zinc-300">
-      <header className="relative z-10 flex flex-col gap-2 border-b-[1.5px] border-[#27272f] bg-[#121217] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+      <header className="relative z-10 flex flex-col gap-2 border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <GhostMark />
           <div>
@@ -554,9 +593,9 @@ export default function GhostFilterDashboard() {
               <h1 className="text-[17px] tracking-tight text-zinc-50">
                 <span className="font-bold">Ghost</span>
                 <span className="font-light text-zinc-400">Filter</span>
-                <span className="ml-1 align-top text-[10px] font-bold text-[#1fe3ad]">AI</span>
+                <span className="ml-1 align-top text-[10px] font-bold text-[var(--accent)]">AI</span>
               </h1>
-              <span className="rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+              <span className="rounded border-[1.5px] border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
                 Scam &amp; Phishing Shield
               </span>
               <span className="rounded border-[1.5px] border-[#f5a623] bg-[#1a140a] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#f5a623]">
@@ -568,9 +607,19 @@ export default function GhostFilterDashboard() {
             </p>
           </div>
         </div>
-        <Suspense fallback={null}>
-          <ConnectBanner />
-        </Suspense>
+        <div className="flex items-center gap-4">
+          <Suspense fallback={null}>
+            <ConnectBanner />
+          </Suspense>
+          <ThemeSwitcher />
+          <Link
+            href="/profile"
+            className="flex items-center gap-1.5 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)] px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Analytics
+          </Link>
+        </div>
       </header>
 
       <main className="relative z-10 grid grid-cols-1 lg:grid-cols-12">
@@ -579,7 +628,7 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="order-2 col-span-1 flex h-[360px] flex-col border-b-[1.5px] border-[#27272f] lg:order-1 lg:col-span-3 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px]"
+          className="order-2 col-span-1 flex h-[360px] flex-col border-b-[1.5px] border-[var(--line)] lg:order-1 lg:col-span-3 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px]"
         >
           <SectionLabel
             icon={Inbox}
@@ -607,9 +656,9 @@ export default function GhostFilterDashboard() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     onClick={() => setSelectedId(s._id)}
-                    className={`mb-1.5 flex w-full items-start gap-2.5 rounded-md border-l-[3px] bg-[#121217] px-2.5 py-2 text-left text-[11px] hover:bg-[#181820] ${
+                    className={`mb-1.5 flex w-full items-start gap-2.5 rounded-md border-l-[3px] bg-[var(--panel)] px-2.5 py-2 text-left text-[11px] hover:bg-[#181820] ${
                       TONE_BORDER[t]
-                    } ${isSelected ? "ring-1 ring-[#34343e]" : ""}`}
+                    } ${isSelected ? "ring-1 ring-[var(--line-strong)]" : ""}`}
                   >
                     <div className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate font-mono text-zinc-300">
@@ -634,13 +683,13 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-          className="order-1 col-span-1 flex flex-col border-b-[1.5px] border-[#27272f] lg:order-2 lg:col-span-6 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px]"
+          className="order-1 col-span-1 flex flex-col border-b-[1.5px] border-[var(--line)] lg:order-2 lg:col-span-6 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px]"
         >
           <SectionLabel icon={Plug}>Connect Accounts</SectionLabel>
-          <div className="flex flex-wrap gap-2 border-b-[1.5px] border-[#27272f] px-5 py-4">
+          <div className="flex flex-wrap gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-4">
             {/* Google (Gmail + Drive share one connection) */}
             {gmailConnection ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c1a16] px-3 py-2 text-[11px] text-[#3eeec0]">
+              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] text-[var(--accent-bright)]">
                 <Mail className="h-3.5 w-3.5" />
                 <span className="font-bold">{gmailConnection.accountEmail ?? "Google connected"}</span>
                 <ScanButton
@@ -656,8 +705,8 @@ export default function GhostFilterDashboard() {
                   onClick={() => runScan("drive")}
                 />
                 <button
-                  onClick={() => handleDisconnect(gmailConnection._id)}
-                  className="flex items-center gap-1 rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
+                  onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
+                  className="flex items-center gap-1 rounded border-[1.5px] border-[var(--line-strong)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
                 >
                   <Unlink className="h-3 w-3" />
                   Disconnect
@@ -671,7 +720,7 @@ export default function GhostFilterDashboard() {
 
             {/* GitHub */}
             {githubConnection ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[#1fe3ad] bg-[#0c1a16] px-3 py-2 text-[11px] text-[#3eeec0]">
+              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] text-[var(--accent-bright)]">
                 <Code2 className="h-3.5 w-3.5" />
                 <span className="font-bold">{githubConnection.accountName ? `@${githubConnection.accountName}` : "GitHub connected"}</span>
                 <ScanButton
@@ -681,8 +730,8 @@ export default function GhostFilterDashboard() {
                   onClick={() => runScan("github")}
                 />
                 <button
-                  onClick={() => handleDisconnect(githubConnection._id)}
-                  className="flex items-center gap-1 rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
+                  onClick={() => handleDisconnect(githubConnection._id, "GitHub")}
+                  className="flex items-center gap-1 rounded border-[1.5px] border-[var(--line-strong)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
                 >
                   <Unlink className="h-3 w-3" />
                   Disconnect
@@ -695,21 +744,45 @@ export default function GhostFilterDashboard() {
             )}
 
             {/* Outlook — not built yet */}
-            <div className="flex cursor-not-allowed items-center gap-2 rounded-md border-[1.5px] border-dashed border-[#27272f] px-3 py-2 text-[11px] text-zinc-600">
+            <div className="flex cursor-not-allowed items-center gap-2 rounded-md border-[1.5px] border-dashed border-[var(--line)] px-3 py-2 text-[11px] text-zinc-600">
               <Mail className="h-3.5 w-3.5" />
               Outlook
               <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-700">Soon</span>
             </div>
           </div>
+
+          {(gmailConnection || githubConnection) && (
+            <div className="flex flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--line)] px-5 py-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                Scan depth
+              </span>
+              <div className="flex overflow-hidden rounded-md border-[1.5px] border-[var(--line)]">
+                {[10, 25, 50].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setScanDepth(n)}
+                    className={`px-2.5 py-1 text-[11px] font-bold tabular-nums transition-colors ${
+                      scanDepth === n
+                        ? "bg-[var(--accent)] text-[var(--accent-ink)]"
+                        : "bg-[var(--panel)] text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[10px] text-zinc-600">most recent items per scan</span>
+            </div>
+          )}
           {scanError && (
-            <p className="border-b-[1.5px] border-[#27272f] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]">
+            <p className="border-b-[1.5px] border-[var(--line)] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]">
               {scanError}
             </p>
           )}
 
           {/* Channels that can't be auto-connected (no API to read personal messages) —
               honest manual-paste path instead of fake "connect" buttons. */}
-          <div className="border-b-[1.5px] border-[#27272f] px-5 py-3">
+          <div className="border-b-[1.5px] border-[var(--line)] px-5 py-3">
             <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
               <span className="font-bold text-zinc-400">Can&apos;t be auto-connected.</span> Apps like these
               don&apos;t let outside tools read your private chats — tap one and paste the message in.
@@ -724,8 +797,8 @@ export default function GhostFilterDashboard() {
                     onClick={() => pickChannel(c.label)}
                     className={`flex items-center gap-1.5 rounded-md border-[1.5px] px-2.5 py-1.5 text-[10px] font-semibold transition-transform hover:-translate-y-0.5 ${
                       active
-                        ? "border-[#1fe3ad] bg-[#0c1a16] text-[#3eeec0]"
-                        : "border-[#27272f] bg-[#121217] text-zinc-400 hover:border-[#34343e]"
+                        ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
+                        : "border-[var(--line)] bg-[var(--panel)] text-zinc-400 hover:border-[var(--line-strong)]"
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -739,19 +812,29 @@ export default function GhostFilterDashboard() {
           <SectionLabel icon={FileSearch}>
             {sourceHint ? `Paste the ${sourceHint} message` : "Paste a Message to Analyze"}
           </SectionLabel>
-          <div className="flex flex-col gap-2.5 border-b-[1.5px] border-[#27272f] px-5 py-4">
+          <div className="flex flex-col gap-2.5 border-b-[1.5px] border-[var(--line)] px-5 py-4">
             <textarea
               ref={textareaRef}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  handleAnalyze();
+                }
+              }}
               placeholder={
                 sourceHint
                   ? `Paste the suspicious ${sourceHint} message here...`
                   : "Paste a suspicious email, text message, or DM here..."
               }
               rows={4}
-              className="w-full resize-none rounded-md border-[1.5px] border-[#27272f] bg-[#0e0e12] px-3 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-600 focus:border-[#1fe3ad] focus:outline-none"
+              className="w-full resize-none rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] px-3 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none"
             />
+            <p className="text-[10px] text-zinc-600">
+              Tip: paste a full email <span className="text-zinc-500">with headers</span> (Gmail → ⋮ → &ldquo;Show original&rdquo;) for deep header forensics — sender spoofing, Reply-To mismatches, SPF/DKIM/DMARC. Press{" "}
+              <span className="font-mono text-zinc-500">⌘/Ctrl + Enter</span> to analyze.
+            </p>
             <div className="flex flex-wrap items-center gap-1.5">
               {EXAMPLES.map((ex) => (
                 <button
@@ -762,7 +845,7 @@ export default function GhostFilterDashboard() {
                     analyzeText(ex.text);
                   }}
                   disabled={analyzing}
-                  className="rounded-full border-[1.5px] border-[#27272f] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition-colors hover:border-[#1fe3ad] hover:text-[#3eeec0] disabled:opacity-50"
+                  className="rounded-full border-[1.5px] border-[var(--line)] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-bright)] disabled:opacity-50"
                 >
                   {ex.label}
                 </button>
@@ -770,7 +853,7 @@ export default function GhostFilterDashboard() {
               <button
                 onClick={handleAnalyze}
                 disabled={!messageText.trim() || analyzing}
-                className="ml-auto flex items-center gap-1.5 rounded-md border-[1.5px] border-[#1fe3ad] bg-[#1fe3ad] px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[#06231c] transition-all hover:bg-[#3eeec0] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[#27272f] disabled:bg-[#1a1a22] disabled:text-zinc-600"
+                className="ml-auto flex items-center gap-1.5 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent)] px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[var(--accent-ink)] transition-all hover:bg-[var(--accent-bright)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[#1a1a22] disabled:text-zinc-600"
                 style={!messageText.trim() || analyzing ? undefined : { boxShadow: "2.5px 2.5px 0 0 #0a4a3a" }}
               >
                 {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />}
@@ -779,7 +862,7 @@ export default function GhostFilterDashboard() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center border-b-[1.5px] border-[#27272f] px-6 py-7">
+          <div className="flex flex-col items-center border-b-[1.5px] border-[var(--line)] px-6 py-7">
             <TiltCard className="[transform-style:preserve-3d]">
               <ThreatGauge value={gaugeValue} tone={tone} scanning={analyzing} />
             </TiltCard>
@@ -789,7 +872,7 @@ export default function GhostFilterDashboard() {
             <span className="pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
               Analyzed Message
             </span>
-            <div className="relative min-h-[120px] rounded-md border-[1.5px] border-[#27272f] bg-[#0e0e12] p-4 font-mono text-[12.5px] leading-[1.8] text-zinc-400">
+            <div className="relative min-h-[120px] rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] p-4 font-mono text-[12.5px] leading-[1.8] text-zinc-400">
               {selected && <VerdictStamp verdict={selected.verdict} />}
               {selected ? (
                 <p className="whitespace-pre-wrap">
@@ -798,9 +881,9 @@ export default function GhostFilterDashboard() {
                       key={i}
                       className={
                         seg.severity === "red"
-                          ? "rounded-sm bg-[#ef4060] px-0.5 text-[#0c0c10]"
+                          ? "rounded-sm bg-[#ef4060] px-0.5 text-[var(--ink)]"
                           : seg.severity === "amber"
-                          ? "rounded-sm bg-[#f5a623] px-0.5 text-[#0c0c10]"
+                          ? "rounded-sm bg-[#f5a623] px-0.5 text-[var(--ink)]"
                           : ""
                       }
                     >
@@ -817,6 +900,64 @@ export default function GhostFilterDashboard() {
                 </div>
               )}
             </div>
+
+            {/* PhishTool-style header forensics — shown when the analyzed item is a real email
+                (Gmail scan, or a pasted raw email with headers). */}
+            {selected?.forensics && (
+              <div className="mt-4 rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)]">
+                <div className="flex items-center gap-2 border-b-[1.5px] border-[var(--line)] px-4 py-2.5">
+                  <FileSearch className="h-3.5 w-3.5 text-[var(--accent)]" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+                    Email Header Forensics
+                  </span>
+                </div>
+
+                {selected.forensics.indicators.length > 0 && (
+                  <div className="flex flex-col gap-2 border-b-[1.5px] border-[var(--line)] px-4 py-3">
+                    {selected.forensics.indicators.map((ind, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <ShieldAlert
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                          style={{ color: ind.severity === "red" ? "#ef4060" : "#f5a623" }}
+                        />
+                        <div>
+                          <span
+                            className="text-[11px] font-bold"
+                            style={{ color: ind.severity === "red" ? "#ef4060" : "#f5a623" }}
+                          >
+                            {ind.label}
+                          </span>
+                          <p className="text-[11px] leading-relaxed text-zinc-500">{ind.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="divide-y divide-[var(--line)]">
+                  {selected.forensics.fields.map((f, i) => {
+                    const dot =
+                      f.status === "bad" ? "#ef4060" : f.status === "warn" ? "#f5a623" : f.status === "ok" ? "var(--accent)" : "#52525b";
+                    return (
+                      <div key={i} className="flex items-start gap-3 px-4 py-2 text-[11px]">
+                        {f.status ? (
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: dot }} />
+                        ) : (
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />
+                        )}
+                        <span className="w-28 shrink-0 font-semibold text-zinc-500">{f.label}</span>
+                        <span
+                          className="min-w-0 flex-1 break-all font-mono"
+                          style={{ color: f.status === "bad" ? "#ef4060" : f.status === "warn" ? "#f5a623" : "#a1a1aa" }}
+                        >
+                          {f.value}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </motion.section>
 
@@ -830,14 +971,14 @@ export default function GhostFilterDashboard() {
           <SectionLabel icon={ShieldAlert}>Verdict</SectionLabel>
           <div className="flex flex-col gap-4 px-4 py-4">
             <div
-              className={`rounded-lg border-[1.5px] bg-[#121217] px-4 py-4 ${
-                tone === "critical" ? "border-[#ef4060]" : "border-[#27272f]"
+              className={`rounded-lg border-[1.5px] bg-[var(--panel)] px-4 py-4 ${
+                tone === "critical" ? "border-[#ef4060]" : "border-[var(--line)]"
               }`}
               style={tone === "critical" ? { boxShadow: "3px 3px 0 0 #4a0a18" } : undefined}
             >
               <div className="flex items-center gap-2">
                 {tone === "clear" ? (
-                  <ShieldCheck className="h-4 w-4 text-[#1fe3ad]" />
+                  <ShieldCheck className="h-4 w-4 text-[var(--accent)]" />
                 ) : (
                   <ShieldAlert className={`h-4 w-4 ${TONE_TEXT[tone]}`} />
                 )}
@@ -851,7 +992,7 @@ export default function GhostFilterDashboard() {
             </div>
 
             {selected && (
-              <div className="rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+              <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   What to do
                 </span>
@@ -859,7 +1000,7 @@ export default function GhostFilterDashboard() {
               </div>
             )}
 
-            <div className="flex flex-col gap-3 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+            <div className="flex flex-col gap-3 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                 Signal Breakdown
               </span>
@@ -876,7 +1017,7 @@ export default function GhostFilterDashboard() {
             </div>
 
             {selected && selected.flaggedPhrases.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   Flagged Phrases
                 </span>
@@ -891,47 +1032,64 @@ export default function GhostFilterDashboard() {
               </div>
             )}
 
-            {selected && selected.linkIntel && selected.linkIntel.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+            {selected && (
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Database className="h-3 w-3" />
                   Threat Intelligence
+                  <span className="ml-auto font-mono text-[9px] font-normal normal-case tracking-normal text-zinc-600">
+                    VirusTotal · urlscan.io
+                  </span>
                 </span>
-                {selected.linkIntel.map((li, i) => {
-                  const flagged = li.vtMalicious > 0 || li.vtSuspicious > 0;
-                  return (
-                    <div key={i} className="flex items-center justify-between text-[11px]">
-                      <span className="truncate font-mono text-zinc-400">{li.domain}</span>
-                      <span className={`shrink-0 font-mono font-bold ${flagged ? "text-[#ef4060]" : "text-[#3eeec0]"}`}>
-                        {flagged ? `${li.vtMalicious + li.vtSuspicious} engines flagged` : "clean on VirusTotal"}
-                      </span>
-                    </div>
-                  );
-                })}
+                {selected.linkIntel && selected.linkIntel.length > 0 ? (
+                  selected.linkIntel.map((li, i) => {
+                    const flagged = li.vtMalicious > 0 || li.vtSuspicious > 0;
+                    return (
+                      <div key={i} className="flex items-center justify-between text-[11px]">
+                        <span className="truncate font-mono text-zinc-400">{li.domain}</span>
+                        <span className={`shrink-0 font-mono font-bold ${flagged ? "text-[#ef4060]" : "text-[var(--accent-bright)]"}`}>
+                          {flagged ? `${li.vtMalicious + li.vtSuspicious} engines flagged` : "clean on VirusTotal"}
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-[11px] text-zinc-600">
+                    No links found in this message to cross-check against threat databases.
+                  </p>
+                )}
               </div>
             )}
 
             {selected && selected.screenshot && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <ImageIcon className="h-3 w-3" />
                   Sandboxed Page Preview
                 </span>
-                {selected.screenshot.ready ? (
+                {/* Always attempt the image — urlscan renders it within ~15-20s, so it may not
+                    be ready the instant the scan returns, but resolves shortly after (and on any
+                    later view of this result). If it isn't up yet, show a fallback note. */}
+                <img
                   // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable urlscan.io image
-                  <img
-                    src={selected.screenshot.screenshotUrl}
-                    alt="Sandboxed screenshot of the linked page"
-                    className="w-full rounded border-[1.5px] border-[#27272f]"
-                  />
-                ) : (
-                  <p className="text-[11px] text-zinc-600">Still rendering on urlscan.io — check the full report shortly.</p>
-                )}
+                  src={selected.screenshot.screenshotUrl}
+                  alt="Sandboxed screenshot of the linked page"
+                  className="w-full rounded border-[1.5px] border-[var(--line)]"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    img.style.display = "none";
+                    const note = img.nextElementSibling as HTMLElement | null;
+                    if (note) note.style.display = "block";
+                  }}
+                />
+                <p className="hidden text-[11px] text-zinc-600">
+                  Still rendering on urlscan.io — open the full report below, it&apos;ll be ready in a few seconds.
+                </p>
                 <a
                   href={selected.screenshot.resultUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 hover:text-[#3eeec0]"
+                  className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 hover:text-[var(--accent-bright)]"
                 >
                   <ExternalLink className="h-3 w-3" />
                   Full urlscan.io report
@@ -940,7 +1098,7 @@ export default function GhostFilterDashboard() {
             )}
 
             {selected && selected.attachmentIntel && selected.attachmentIntel.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[#27272f] bg-[#121217] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Paperclip className="h-3 w-3" />
                   Attachment Scan
@@ -950,7 +1108,7 @@ export default function GhostFilterDashboard() {
                   return (
                     <div key={i} className="flex items-center justify-between text-[11px]">
                       <span className="truncate font-mono text-zinc-400">{a.filename}</span>
-                      <span className={`shrink-0 font-mono font-bold ${malicious ? "text-[#ef4060]" : "text-[#3eeec0]"}`}>
+                      <span className={`shrink-0 font-mono font-bold ${malicious ? "text-[#ef4060]" : "text-[var(--accent-bright)]"}`}>
                         {!a.found ? "unknown file" : malicious ? `${a.vtMalicious} engines flagged` : "clean on VirusTotal"}
                       </span>
                     </div>
@@ -974,8 +1132,8 @@ export default function GhostFilterDashboard() {
 
             {gmailConnection && (
               <button
-                onClick={() => handleDisconnect(gmailConnection._id)}
-                className="flex items-center justify-center gap-1.5 rounded-md border-[1.5px] border-[#27272f] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
+                className="flex items-center justify-center gap-1.5 rounded-md border-[1.5px] border-[var(--line)] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
               >
                 <Trash2 className="h-3 w-3" />
                 Revoke Gmail Access

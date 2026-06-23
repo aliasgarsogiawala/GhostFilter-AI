@@ -76,6 +76,26 @@ export default defineSchema({
         })
       )
     ),
+    forensics: v.optional(
+      v.object({
+        fields: v.array(
+          v.object({
+            label: v.string(),
+            value: v.string(),
+            status: v.optional(
+              v.union(v.literal("ok"), v.literal("warn"), v.literal("bad"))
+            ),
+          })
+        ),
+        indicators: v.array(
+          v.object({
+            label: v.string(),
+            detail: v.string(),
+            severity: v.union(v.literal("amber"), v.literal("red")),
+          })
+        ),
+      })
+    ),
   })
     .index("by_owner", ["ownerId"])
     .index("by_connection_external", ["connectionId", "externalId"]),

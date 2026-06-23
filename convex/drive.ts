@@ -11,8 +11,9 @@ const TEXT_MIME = "text/plain";
 const DOC_MIME = "application/vnd.google-apps.document";
 
 export const scanDrive = action({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+    const max = Math.min(MAX_FILES, Math.max(1, limit ?? 25));
     // Reuses the existing Google (Gmail) connection — same OAuth, now with the drive.readonly
     // scope. Attackers share malicious Google Docs (phishing links) to bypass email filters,
     // so we scan files recently shared with the user.
@@ -36,7 +37,7 @@ export const scanDrive = action({
       list = await drive.files.list({
         q: "sharedWithMe = true and trashed = false",
         orderBy: "sharedWithMeTime desc",
-        pageSize: MAX_FILES,
+        pageSize: max,
         fields: "files(id, name, mimeType, webViewLink, owners(displayName, emailAddress))",
       });
     } catch {
