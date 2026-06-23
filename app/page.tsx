@@ -48,7 +48,7 @@ interface ScanResultDoc {
   signals: { label: string; value: number }[];
   aiReviewed: boolean;
   linkIntel?: { url: string; domain: string; vtMalicious: number; vtSuspicious: number }[];
-  screenshot?: { url: string; resultUrl: string; screenshotUrl: string; ready: boolean };
+  screenshot?: { url: string; resultUrl: string; screenshotUrl: string; uuid: string; ready: boolean };
   attachmentIntel?: { filename: string; sha256: string; found: boolean; vtMalicious: number; vtSuspicious: number }[];
 }
 

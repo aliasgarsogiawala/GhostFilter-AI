@@ -60,6 +60,7 @@ export default defineSchema({
         url: v.string(),
         resultUrl: v.string(),
         screenshotUrl: v.string(),
+        uuid: v.string(),
         ready: v.boolean(),
       })
     ),
