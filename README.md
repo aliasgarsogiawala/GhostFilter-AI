@@ -1,79 +1,245 @@
 # GhostFilter AI
 
-A scam and phishing message analyzer. Paste a suspicious text, email, or DM
-and get a real verdict — or connect a Gmail account and scan the inbox
-directly. Built for the **Youth Code x AI** hackathon.
+GhostFilter AI is a scam and phishing safety tool built for the **Youth Code x AI** hackathon. It helps a normal person answer one urgent question:
 
-Two layers do the actual work:
+> “Can I trust this message, link, email, or file?”
 
-1. **A hand-trained classifier** (`lib/ml-classifier.ts`) triages every
-   message instantly and for free — logistic regression trained from
-   scratch (no ML libraries) on the public SMS Spam Collection dataset,
-   ~98% test accuracy. See `scripts/train-classifier.ts`.
-2. **Gemini** (`lib/gemini.ts`) only gets called when the classifier or a
-   deterministic heuristic (lookalike-domain detection, SSRF-guarded
-   shortened-link expansion — `lib/heuristics.ts`) flags something, where it
-   returns a structured verdict, confidence, flagged phrases, and a
-   recommendation.
+Instead of only saying “spam” or “not spam,” GhostFilter explains the risk in plain English, highlights the evidence, and gives the user a safer next step before they click, reply, pay, or share a code.
 
-Everything is tied together in `convex/pipeline.ts` and used by both the
-no-login paste-box analyzer and the Gmail scanner (`convex/gmail.ts`).
-Convex (`convex/`) stores scan results and OAuth connections and pushes
-updates to the dashboard live — no page refresh.
+## What judges should know
+
+GhostFilter is designed as a public-facing protection layer for everyday scams:
+
+- Paste suspicious SMS, WhatsApp/Telegram/Discord/Instagram-style messages, emails, or links.
+- Upload screenshots, PDFs, `.eml` emails, and text files.
+- Connect read-only sources like Gmail, Google Drive, and GitHub notifications.
+- Get a clear verdict: **Looks safe**, **Be careful**, or **Likely scam**.
+- See why: suspicious phrases, unsafe links, sender/header forensics, risk signals, and safe page previews.
+- Take action: safety checklist, copy/share/download report, rescan, delete history, and submit correction feedback.
+
+## Live vs roadmap
+
+| Area | Status | What it does |
+|---|---:|---|
+| Manual message scanner | Live | Paste SMS, chat messages, emails, or links. |
+| File scanner | Live | Reads screenshots/images, PDFs, `.eml`, and text files before analysis. |
+| Gmail | Live | Read-only OAuth scan of recent inbox messages. |
+| Google Drive | Live | Read-only scan of recent Drive files/metadata. |
+| GitHub | Live | Read-only scan of notification-style security/social-engineering messages. |
+| VirusTotal | Live when key is set | Checks domain reputation for links. |
+| urlscan.io | Live when key is set | Creates a sandboxed page preview for suspicious links. |
+| WhatsApp / Telegram / Discord / SMS lanes | Manual paste | Browsers cannot read private chats automatically, so GhostFilter supports them as paste lanes. |
+| Outlook / Slack | Roadmap UI | Shown as next integration lanes for the product direction. |
+
+## Demo flow
+
+1. Open the landing page.
+2. Click **Open scanner**.
+3. Paste a suspicious message, for example:
+
+   ```text
+   send 150 rupees, im real shah rukh khan
+   ```
+
+4. Review:
+   - risk score
+   - plain-English explanation
+   - pattern spotted
+   - safety checklist
+   - highlighted message evidence
+5. Try the file tab with a screenshot/PDF, or connect Gmail/GitHub if credentials are configured.
+
+## How it works
+
+GhostFilter combines deterministic security checks, a local ML classifier, and selective AI review.
+
+```text
+User input / connected source
+        ↓
+Text + file extraction
+        ↓
+Local classifier + heuristics
+        ↓
+Link intelligence + email forensics
+        ↓
+Gemini review only when needed
+        ↓
+Verdict + explanation + safe action plan
+```
+
+### Analysis layers
+
+1. **Local classifier**
+   - `lib/ml-classifier.ts`
+   - Logistic regression trained from scratch without ML libraries.
+   - Uses `lib/ml-weights.json`.
+   - Fast triage runs on every scan.
+
+2. **Deterministic security heuristics**
+   - `lib/heuristics.ts` checks links, shortened URLs, redirects, and lookalike domains.
+   - `lib/socialEngineering.ts` catches impersonation + payment patterns.
+   - `lib/promptInjection.ts` detects manipulation attempts.
+   - `lib/emailHeaders.ts` parses sender/authentication/header mismatches.
+
+3. **External threat intelligence**
+   - `lib/virustotal.ts` checks domain reputation.
+   - `lib/urlscan.ts` creates a sandboxed preview of linked pages.
+
+4. **AI review**
+   - `lib/gemini.ts` gives structured verdicts, confidence, flagged phrases, and recommendations.
+   - Gemini is called only when the classifier or deterministic checks find enough risk, which keeps the system cheaper and faster.
+
+5. **File extraction**
+   - `lib/fileExtraction.ts`
+   - Uses Gemini multimodal extraction for screenshots/images and PDFs.
+
+## Product features
+
+- Sleek landing page with splash screen.
+- Dark/light mode.
+- Main scanner with message, email, link, and file modes.
+- 3D risk card and tactile UI surfaces.
+- Collapsible scan history sidebar.
+- Search, filter, and sort scan history.
+- Human-friendly result panel.
+- Technical details hidden behind disclosure panels.
+- Copy/download/share scan reports.
+- Correction feedback for wrong results.
+- Read-only connected source scanning.
+- Clear distinction between live integrations and roadmap lanes.
+
+## Tech stack
+
+- **Next.js 16** app router
+- **React 19**
+- **Convex** backend, database, queries, mutations, and actions
+- **Gemini** for structured review and file extraction
+- **Framer Motion** for tactile UI motion
+- **Tailwind CSS v4**
+- **VirusTotal** and **urlscan.io** integrations
+
+## Project structure
+
+```text
+app/
+  LandingPage.tsx              Public landing page
+  dashboard/page.tsx           Main scanner UI
+  profile/page.tsx             History/analytics view
+  api/auth/google/             Google OAuth routes
+  api/auth/github/             GitHub OAuth routes
+
+convex/
+  pipeline.ts                  Shared analysis pipeline
+  gmail.ts                     Gmail scanner
+  drive.ts                     Google Drive scanner
+  github.ts                    GitHub notification scanner
+  scanResults.ts               Scan storage, feedback, deletion
+  schema.ts                    Convex database schema
+
+lib/
+  ml-classifier.ts             Local classifier
+  socialEngineering.ts         Impersonation/payment detection
+  heuristics.ts                Link/domain heuristics
+  emailHeaders.ts              Email forensic checks
+  gemini.ts                    AI reviewer
+  fileExtraction.ts            Image/PDF text extraction
+  virustotal.ts                Domain reputation
+  urlscan.ts                   Sandboxed page preview
+
+scripts/
+  train-classifier.ts          Offline classifier training
+  download-corpus.sh           Optional public corpus download
+```
 
 ## Setup
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-### Environment variables (`.env.local`)
-
-| Variable | Where to get it |
-|---|---|
-| `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL` | Auto-created the first time you run `npx convex dev` — no login required, it provisions a local backend. |
-| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey). Also mirror it into Convex: `npx convex env set GEMINI_API_KEY <key>` (Convex actions run in their own process and don't read `.env.local`). |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Needed for the Gmail "Connect" flow. Create an OAuth client in [Google Cloud Console](https://console.cloud.google.com): enable the Gmail API, configure the OAuth consent screen (scopes `gmail.readonly`, `openid`, `email`; keep it in **Testing** mode and add your test Gmail accounts), then create a Web application OAuth client with redirect URI `http://localhost:3000/api/auth/google/callback`. Set these in both `.env.local` (for the Next.js route handlers) and Convex (`npx convex env set GOOGLE_CLIENT_ID <id>` / `GOOGLE_CLIENT_SECRET <secret>`, for token refresh in `convex/gmail.ts`). |
-| `NEXT_PUBLIC_APP_URL` | Optional, defaults to `http://localhost:3000`. Set this to your deployed URL in production and update the OAuth redirect URI to match. |
-
-### Run
+Run Convex in one terminal:
 
 ```bash
-npx convex dev   # keep running in its own terminal — watches convex/ and pushes changes
+npx convex dev
+```
+
+Run Next.js in another terminal:
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for the public landing page,
-then enter the scanner at [http://localhost:3000/dashboard](http://localhost:3000/dashboard).
+Open:
 
-### Retrain the classifier
+- Landing page: [http://localhost:3000](http://localhost:3000)
+- Scanner: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
-```bash
-scripts/download-corpus.sh   # fetches the SpamAssassin email corpus (gitignored, ~42MB)
-npm run train-classifier     # regenerates lib/ml-weights.json
+## Environment variables
+
+Create `.env.local`.
+
+| Variable | Required? | Purpose |
+|---|---:|---|
+| `NEXT_PUBLIC_CONVEX_URL` | Yes | Convex client URL. Created by `npx convex dev`. |
+| `CONVEX_DEPLOYMENT` | Yes | Convex deployment identifier. |
+| `NEXT_PUBLIC_CONVEX_SITE_URL` | Usually | Convex site URL. |
+| `NEXT_PUBLIC_APP_URL` | Optional | Defaults to `http://localhost:3000`; set in production. |
+| `GEMINI_API_KEY` | Yes for AI/file review | Gemini structured verdicts and file extraction. Also set in Convex with `npx convex env set GEMINI_API_KEY <key>`. |
+| `GOOGLE_CLIENT_ID` | For Gmail/Drive | Google OAuth client ID. Also set in Convex. |
+| `GOOGLE_CLIENT_SECRET` | For Gmail/Drive | Google OAuth secret. Also set in Convex. |
+| `GITHUB_CLIENT_ID` | For GitHub | GitHub OAuth client ID. |
+| `GITHUB_CLIENT_SECRET` | For GitHub | GitHub OAuth secret. |
+| `VIRUSTOTAL_API_KEY` | Optional | Domain reputation checks. Set in Convex for actions. |
+| `URLSCAN_API_KEY` | Optional | Sandboxed link previews. Set in Convex for actions. |
+
+Google OAuth redirect URI for local development:
+
+```text
+http://localhost:3000/api/auth/google/callback
 ```
 
-The classifier trains on a combined corpus so it generalizes beyond SMS:
-- `scripts/data/sms-spam.csv` — the SMS Spam Collection (short text messages).
-- `scripts/data/spamassassin/` — the SpamAssassin public corpus of real emails, including
-  `hard_ham` (legitimate-but-promotional newsletters/marketing). That class is what teaches
-  the model not to flag legitimate newsletters (e.g. daily.dev) as spam.
+GitHub OAuth callback URL for local development:
 
-Only the trained weights (`lib/ml-weights.json`) are committed; the raw corpus is gitignored
-and re-downloadable via `scripts/download-corpus.sh`.
+```text
+http://localhost:3000/api/auth/github/callback
+```
 
-## Project structure
+## Retrain the classifier
 
-- `app/page.tsx` and `app/LandingPage.tsx` — the public landing page and branded splash experience.
-- `app/dashboard/page.tsx` — the scanner workspace (connected accounts, paste-box analyzer, reactive scan history, verdict/signal breakdown).
-- `app/api/auth/google/` — Gmail OAuth connect + callback routes.
-- `convex/` — schema, the shared analysis pipeline, the Gmail scan action, and the connections/scanResults tables.
-- `lib/` — heuristics, the ML classifier, the Gemini wrapper, and shared helpers used by both the manual analyzer and the Gmail scanner.
-- `scripts/train-classifier.ts` — offline training script (no ML dependencies).
+```bash
+scripts/download-corpus.sh
+npm run train-classifier
+```
 
-## Privacy
+The classifier can train on:
 
-Gmail access is read-only (`gmail.readonly`) and only used to scan for
-scams — GhostFilter never sends, deletes, or modifies anything in a
-connected account. OAuth tokens are stored server-side in Convex and are
-never sent to the browser. Disconnecting clears the stored tokens.
+- `scripts/data/sms-spam.csv`
+- optional SpamAssassin email corpus downloaded by the script
+
+Only the trained weights are committed. The raw corpus is re-downloadable and ignored by git.
+
+## Privacy and safety
+
+- Connected Google/GitHub access is read-only.
+- GhostFilter cannot send messages, edit files, delete emails, or act on behalf of the user.
+- OAuth tokens are stored server-side in Convex, not exposed to the browser.
+- Results are guidance, not a guarantee.
+- For private chat apps, GhostFilter uses manual paste lanes instead of pretending it can read encrypted personal messages.
+
+## Why this can win a hackathon
+
+GhostFilter is not just a classifier demo. It is a full product loop:
+
+- input from real user channels
+- local ML + deterministic security checks
+- AI reasoning only when useful
+- threat-intelligence integrations
+- file/image/PDF support
+- readable guidance for non-technical users
+- report/export/share workflow
+- correction feedback loop
+- polished landing page and dashboard UI
+
+It aims to make scam detection understandable and actionable for the public, not only for security experts.

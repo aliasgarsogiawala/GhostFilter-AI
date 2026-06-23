@@ -218,6 +218,46 @@ textarea:focus-visible {
   animation: landing-splash-enter 0.2s ease-out both;
 }
 
+.landing-tilt-card,
+.landing-connection-card,
+.landing-mini-card {
+  transform-style: preserve-3d;
+  box-shadow: 7px 7px 0 0 #050507;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.landing-tilt-card {
+  transform: perspective(900px) rotateX(1.5deg) rotateY(-2deg);
+}
+
+.landing-tilt-card:hover {
+  transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateY(-4px);
+  box-shadow: 10px 10px 0 0 #050507;
+}
+
+.landing-connection-card:hover,
+.landing-mini-card:hover {
+  transform: perspective(700px) translateY(-3px) rotateX(1.2deg) rotateY(-1.2deg);
+  border-color: var(--accent);
+}
+
+.landing-connection-card:nth-child(2n) {
+  transform: perspective(700px) translateY(6px);
+}
+
+.landing-connection-card:nth-child(2n):hover {
+  transform: perspective(700px) translateY(2px) rotateX(1.2deg) rotateY(1.2deg);
+}
+
+[data-appearance="light"] .landing-tilt-card,
+[data-appearance="light"] .landing-connection-card,
+[data-appearance="light"] .landing-mini-card {
+  box-shadow: 7px 7px 0 0 #b7c1ca;
+}
+
 .landing-splash-emblem {
   position: relative;
   overflow: hidden;

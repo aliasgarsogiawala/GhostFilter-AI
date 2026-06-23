@@ -14,10 +14,13 @@ import {
   LockKeyhole,
   Mail,
   MessageSquareText,
+  MessagesSquare,
   Moon,
   ScanLine,
   ShieldCheck,
+  Smartphone,
   Sun,
+  Upload,
 } from "lucide-react";
 import { useAppearance, useTheme } from "@/lib/useTheme";
 
@@ -70,6 +73,17 @@ const FAQS = [
     answer:
       "Do not click, reply, pay, or share a code. Contact the person or organization through a separate method you already trust, such as its official app, website, or phone number.",
   },
+] as const;
+
+const LANDING_CONNECTIONS = [
+  { icon: Mail, label: "Gmail", status: "Live" },
+  { icon: FileCheck2, label: "Drive", status: "Live" },
+  { icon: Code2, label: "GitHub", status: "Live" },
+  { icon: Mail, label: "Outlook", status: "Next" },
+  { icon: MessagesSquare, label: "Slack", status: "Next" },
+  { icon: Smartphone, label: "SMS", status: "Paste" },
+  { icon: MessageSquareText, label: "WhatsApp", status: "Paste" },
+  { icon: Upload, label: "PDF / Image", status: "Live" },
 ] as const;
 
 function BrandMark({ splash = false }: { splash?: boolean }) {
@@ -135,7 +149,7 @@ function AppearanceToggle() {
 
 function ExampleResult() {
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--line-strong)] bg-[var(--panel)]">
+    <div className="landing-tilt-card overflow-hidden rounded-xl border border-[var(--line-strong)] bg-[var(--panel)]">
       <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
         <div>
           <p className="text-[11px] font-semibold text-zinc-300">Example result</p>
@@ -197,7 +211,7 @@ export default function LandingPage() {
     <div className="landing-page min-h-screen bg-[var(--ink)] text-zinc-300">
       <SplashScreen />
 
-      <header className="border-b border-[var(--line)] bg-[var(--ink)] fixed top-0 w-full left-0">
+      <header className="border-b border-[var(--line)] bg-[var(--ink)]">
         <div className="mx-auto flex h-[68px] max-w-6xl items-center justify-between px-5 lg:px-8">
           <Link href="/" className="flex items-center gap-2.5" aria-label="GhostFilter home">
             <BrandMark />
@@ -262,7 +276,7 @@ export default function LandingPage() {
 
               <div className="mt-8 grid max-w-lg gap-2 sm:grid-cols-3">
                 {["No sign-up", "Read-only access", "Clear explanations"].map((item) => (
-                  <span key={item} className="flex items-center gap-2 text-[10px] text-zinc-500">
+                  <span key={item} className="landing-mini-card flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[10px] text-zinc-500">
                     <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
                     {item}
                   </span>
@@ -298,6 +312,40 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b border-[var(--line)]">
+          <div className="mx-auto max-w-6xl px-5 py-12 lg:px-8">
+            <div className="mb-7 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-[11px] font-medium text-[var(--accent)]">Connections and scan lanes</p>
+                <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-[-0.035em] text-zinc-100">
+                  Built like a security command center, simple enough for anyone.
+                </h2>
+              </div>
+              <p className="max-w-sm text-[11px] leading-6 text-zinc-500">
+                Live connectors, upload scanning, and manual paste lanes make the product feel bigger without pretending browsers can read private chats automatically.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {LANDING_CONNECTIONS.map(({ icon: Icon, label, status }) => (
+                <div key={label} className="landing-connection-card rounded-xl border border-[var(--line-strong)] bg-[var(--panel)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--accent)] bg-[var(--input)] text-[var(--accent)]">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className="rounded-full border border-[var(--line-strong)] px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-zinc-500">
+                      {status}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-[14px] font-semibold text-zinc-200">{label}</p>
+                  <p className="mt-1 text-[10px] leading-5 text-zinc-500">
+                    {status === "Live" ? "Available in the scanner." : status === "Paste" ? "Supported through manual paste." : "Roadmap integration slot."}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -372,9 +420,9 @@ export default function LandingPage() {
             GhostFilter AI · Beta
           </span>
           <span className="flex items-center gap-4">
-            {/* <span className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> Gmail</span>
-            <span className="flex items-center gap-1.5"><Code2 className="h-3 w-3" /> GitHub</span> */}
-            <a href="https://github.com/aliasgarsogiawala">By Aliasgar Sogiawala</a>
+            <span className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> Gmail</span>
+            <span className="flex items-center gap-1.5"><Code2 className="h-3 w-3" /> GitHub</span>
+            <span className="flex items-center gap-1.5"><Upload className="h-3 w-3" /> Files</span>
           </span>
         </div>
       </footer>

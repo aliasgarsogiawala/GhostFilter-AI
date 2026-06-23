@@ -358,6 +358,87 @@ const MANUAL_CHANNELS = [
   { id: "telegram", label: "Telegram", icon: Send },
 ] as const;
 
+const CONNECTION_LANES = [
+  {
+    id: "google",
+    label: "Google",
+    sub: "Gmail + Drive",
+    icon: Mail,
+    status: "Live",
+    tone: "accent",
+    detail: "Scan inbox messages, shared files, PDFs, screenshots, and suspicious links.",
+  },
+  {
+    id: "github",
+    label: "GitHub",
+    sub: "Notifications",
+    icon: Code2,
+    status: "Live",
+    tone: "accent",
+    detail: "Review security emails, issue links, repo invites, and unusual notifications.",
+  },
+  {
+    id: "outlook",
+    label: "Outlook",
+    sub: "Microsoft mail",
+    icon: Mail,
+    status: "Next",
+    tone: "info",
+    detail: "Planned OAuth lane for work and school inboxes.",
+  },
+  {
+    id: "slack",
+    label: "Slack",
+    sub: "Workspace DMs",
+    icon: MessagesSquare,
+    status: "Next",
+    tone: "violet",
+    detail: "Designed for suspicious DMs, invite links, and fake admin requests.",
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    sub: "Manual paste",
+    icon: MessageCircle,
+    status: "Paste",
+    tone: "accent",
+    detail: "Use the chat lane for personal messages that browsers cannot auto-read.",
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    sub: "Manual paste",
+    icon: Send,
+    status: "Paste",
+    tone: "warn",
+    detail: "Paste urgent payment, giveaway, crypto, or impersonation messages.",
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    sub: "Manual paste",
+    icon: MessagesSquare,
+    status: "Paste",
+    tone: "violet",
+    detail: "Check Nitro scams, fake staff messages, and server invite links.",
+  },
+  {
+    id: "files",
+    label: "Files",
+    sub: "Screenshots + PDFs",
+    icon: Upload,
+    status: "Live",
+    tone: "info",
+    detail: "Upload screenshots, PDFs, EML files, or text files for extraction and review.",
+  },
+] as const;
+
+const JUDGE_POINTS = [
+  ["7 scan lanes", "messages, email, links, files, Drive, GitHub, chat"],
+  ["Evidence first", "plain-English reasons plus optional technical details"],
+  ["Safe actions", "checklist, report export, share, and feedback loop"],
+] as const;
+
 // ----------------------------------------------------------------------------
 // Threat gauge — 270° arc instrument with tick marks and a hard bezel ring.
 // ----------------------------------------------------------------------------
@@ -517,6 +598,73 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
   );
 }
 
+function DepthCard({
+  children,
+  className = "",
+  hover = true,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  hover?: boolean;
+}) {
+  return (
+    <motion.div
+      whileHover={hover ? { y: -3, rotateX: 1.4, rotateY: -1.4 } : undefined}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+      style={{ transformPerspective: 900 }}
+      className={`rounded-xl border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)] shadow-[5px_5px_0_0_#050507] ${className}`}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function toneColor(tone: "accent" | "info" | "violet" | "warn") {
+  if (tone === "info") return "var(--info)";
+  if (tone === "violet") return "var(--violet)";
+  if (tone === "warn") return "var(--warn)";
+  return "var(--accent)";
+}
+
+function LaneCard({
+  lane,
+  action,
+  active,
+}: {
+  lane: (typeof CONNECTION_LANES)[number];
+  action?: React.ReactNode;
+  active?: boolean;
+}) {
+  const Icon = lane.icon;
+  const color = toneColor(lane.tone);
+  return (
+    <DepthCard className={`p-3 ${active ? "border-[var(--accent)]" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-[var(--input)]"
+            style={{ borderColor: color, color, boxShadow: `2px 2px 0 0 ${color}` }}
+          >
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[12px] font-bold text-zinc-200">{lane.label}</p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">{lane.sub}</p>
+          </div>
+        </div>
+        <span
+          className="shrink-0 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wide"
+          style={{ borderColor: color, color }}
+        >
+          {lane.status}
+        </span>
+      </div>
+      <p className="mt-3 min-h-10 text-[10px] leading-relaxed text-zinc-500">{lane.detail}</p>
+      {action && <div className="mt-3">{action}</div>}
+    </DepthCard>
+  );
+}
+
 function SignalBar({ label, value }: { label: string; value: number }) {
   const barColor = value >= 70 ? "#ef4060" : value >= 35 ? "#f5a623" : "#52525b";
   return (
@@ -543,7 +691,7 @@ function SignalBar({ label, value }: { label: string; value: number }) {
 function GhostMark() {
   return (
     <div
-      className="relative flex h-9 w-9 items-center justify-center rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--ink)]"
+      className="relative flex h-9 w-9 items-center justify-center rounded-md border border-[var(--accent)] bg-[var(--ink)]"
       style={{ boxShadow: "2px 2px 0 0 var(--accent)" }}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -602,7 +750,7 @@ function ScanButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-1 rounded border-[1.5px] border-[var(--accent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-[var(--accent)] hover:text-[var(--accent-ink)] disabled:opacity-50"
+      className="flex items-center gap-1 rounded border border-[var(--accent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide hover:bg-[var(--accent)] hover:text-[var(--accent-ink)] disabled:opacity-50"
     >
       {busy ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Scan className="h-3 w-3" />}
       {label}
@@ -624,7 +772,7 @@ function ConnectButton({
   return (
     <a
       href={href}
-      className="group flex items-center gap-2 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)]"
+      className="group flex items-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)]"
       style={{ boxShadow: "2px 2px 0 0 #000" }}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -646,7 +794,7 @@ function SectionLabel({
   className?: string;
 }) {
   return (
-    <div className={`flex items-center justify-between border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-4 py-3 ${className}`}>
+    <div className={`flex items-center justify-between border-b border-[var(--line)] bg-[var(--panel)] px-4 py-3 ${className}`}>
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-[var(--accent)]" />
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">
@@ -677,7 +825,7 @@ function ConnectBanner() {
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className={`rounded-md border-[1.5px] px-3 py-1.5 text-[11px] font-semibold ${
+          className={`rounded-md border px-3 py-1.5 text-[11px] font-semibold ${
             banner === "success"
               ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
               : "border-[#ef4060] bg-[#1a0c10] text-[#ef4060]"
@@ -1089,7 +1237,7 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className={`order-2 col-span-1 flex flex-col border-b-[1.5px] border-[var(--line)] transition-[height] lg:order-1 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px] ${
+          className={`order-2 col-span-1 flex flex-col border-b border-[var(--line)] transition-[height] lg:order-1 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px] ${
             historyOpen ? "h-[430px] lg:col-span-3" : "h-[49px] lg:col-span-1"
           }`}
         >
@@ -1250,7 +1398,7 @@ export default function GhostFilterDashboard() {
                 </details>
                 <div className="flex-1 overflow-y-auto px-2 py-2">
                   {!scans?.length && (
-                    <div className="mx-1 mt-1 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] p-4">
+                    <div className="mx-1 mt-1 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--accent-bright)]">
                         Your first scan
                       </span>
@@ -1351,11 +1499,11 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-          className={`order-1 col-span-1 flex flex-col border-b-[1.5px] border-[var(--line)] lg:order-2 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px] ${
+          className={`order-1 col-span-1 flex flex-col border-b border-[var(--line)] lg:order-2 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px] ${
             historyOpen ? "lg:col-span-6" : "lg:col-span-8"
           }`}
         >
-          <details className="group order-5 border-b border-[var(--line)] bg-[var(--panel)]">
+          <details open className="group order-5 border-b border-[var(--line)] bg-[var(--panel)]">
             <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5">
               <span className="flex items-center gap-2">
                 <Plug className="h-4 w-4 text-[var(--accent)]" />
@@ -1364,68 +1512,106 @@ export default function GhostFilterDashboard() {
               </span>
               <ChevronDown className="h-4 w-4 text-zinc-600 transition-transform group-open:rotate-180" />
             </summary>
-          <div className="flex flex-wrap gap-2 border-t border-[var(--line)] px-5 py-4">
-            {/* Google (Gmail + Drive share one connection) */}
-            {gmailConnection ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] text-[var(--accent-bright)]">
-                <Mail className="h-3.5 w-3.5" />
-                <span className="font-bold">{gmailConnection.accountEmail ?? "Google connected"}</span>
-                <ScanButton
-                  label="Scan Inbox"
-                  busy={scanningKind === "inbox"}
-                  disabled={!!scanningKind}
-                  onClick={() => runScan("inbox")}
-                />
-                <ScanButton
-                  label="Scan Drive"
-                  busy={scanningKind === "drive"}
-                  disabled={!!scanningKind}
-                  onClick={() => runScan("drive")}
-                />
-                <button
-                  onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
-                  className="flex items-center gap-1 rounded border-[1.5px] border-[var(--line-strong)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
-                >
-                  <Unlink className="h-3 w-3" />
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              ownerId && (
-                <ConnectButton href={`/api/auth/google?ownerId=${ownerId}`} icon={Mail} label="Connect Google" sub="Gmail + Drive" />
-              )
-            )}
-
-            {/* GitHub */}
-            {githubConnection ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] px-3 py-2 text-[11px] text-[var(--accent-bright)]">
-                <Code2 className="h-3.5 w-3.5" />
-                <span className="font-bold">{githubConnection.accountName ? `@${githubConnection.accountName}` : "GitHub connected"}</span>
-                <ScanButton
-                  label="Scan"
-                  busy={scanningKind === "github"}
-                  disabled={!!scanningKind}
-                  onClick={() => runScan("github")}
-                />
-                <button
-                  onClick={() => handleDisconnect(githubConnection._id, "GitHub")}
-                  className="flex items-center gap-1 rounded border-[1.5px] border-[var(--line-strong)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[#ef4060] hover:text-[#ef4060]"
-                >
-                  <Unlink className="h-3 w-3" />
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              ownerId && (
-                <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect GitHub" sub="Notifications" />
-              )
-            )}
-
-            {/* Outlook — not built yet */}
-            <div className="flex cursor-not-allowed items-center gap-2 rounded-md border-[1.5px] border-dashed border-[var(--line)] px-3 py-2 text-[11px] text-zinc-600">
-              <Mail className="h-3.5 w-3.5" />
-              Outlook
-              <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-700">Soon</span>
+          <div className="border-t border-[var(--line)] px-5 py-4">
+            <div className="mb-4 grid gap-2 sm:grid-cols-3">
+              {JUDGE_POINTS.map(([label, copy]) => (
+                <div key={label} className="rounded-lg border border-[var(--line)] bg-[var(--input)] p-3 shadow-[3px_3px_0_0_#050507]">
+                  <p className="font-mono text-[18px] font-black tracking-[-0.05em] text-[var(--accent-bright)]">{label}</p>
+                  <p className="mt-1 text-[9px] leading-relaxed text-zinc-500">{copy}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {CONNECTION_LANES.map((lane) => {
+                if (lane.id === "google") {
+                  return (
+                    <LaneCard
+                      key={lane.id}
+                      lane={lane}
+                      active={!!gmailConnection}
+                      action={
+                        gmailConnection ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            <ScanButton label="Inbox" busy={scanningKind === "inbox"} disabled={!!scanningKind} onClick={() => runScan("inbox")} />
+                            <ScanButton label="Drive" busy={scanningKind === "drive"} disabled={!!scanningKind} onClick={() => runScan("drive")} />
+                            <button
+                              onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
+                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                            >
+                              <Unlink className="h-3 w-3" />
+                              Off
+                            </button>
+                          </div>
+                        ) : (
+                          ownerId && <ConnectButton href={`/api/auth/google?ownerId=${ownerId}`} icon={Mail} label="Connect" sub="OAuth" />
+                        )
+                      }
+                    />
+                  );
+                }
+                if (lane.id === "github") {
+                  return (
+                    <LaneCard
+                      key={lane.id}
+                      lane={lane}
+                      active={!!githubConnection}
+                      action={
+                        githubConnection ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            <ScanButton label="Scan" busy={scanningKind === "github"} disabled={!!scanningKind} onClick={() => runScan("github")} />
+                            <button
+                              onClick={() => handleDisconnect(githubConnection._id, "GitHub")}
+                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                            >
+                              <Unlink className="h-3 w-3" />
+                              Off
+                            </button>
+                          </div>
+                        ) : (
+                          ownerId && <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect" sub="OAuth" />
+                        )
+                      }
+                    />
+                  );
+                }
+                if (lane.id === "files") {
+                  return (
+                    <LaneCard
+                      key={lane.id}
+                      lane={lane}
+                      action={
+                        <button
+                          onClick={() => chooseMode("file")}
+                          className="w-full rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-2 py-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[var(--info)] hover:text-[var(--info)]"
+                        >
+                          Upload file
+                        </button>
+                      }
+                    />
+                  );
+                }
+                const manualMatch = MANUAL_CHANNELS.find((channel) => channel.label.toLowerCase().includes(lane.label.toLowerCase()));
+                return (
+                  <LaneCard
+                    key={lane.id}
+                    lane={lane}
+                    action={
+                      lane.status === "Paste" && manualMatch ? (
+                        <button
+                          onClick={() => pickChannel(manualMatch.label)}
+                          className="w-full rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-2 py-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+                        >
+                          Paste message
+                        </button>
+                      ) : (
+                        <span className="block rounded-md border border-dashed border-[var(--line)] px-2 py-1.5 text-center text-[9px] font-bold uppercase tracking-wide text-zinc-600">
+                          Roadmap ready
+                        </span>
+                      )
+                    }
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -1434,7 +1620,7 @@ export default function GhostFilterDashboard() {
               <span className="text-[10px] font-semibold text-zinc-500">
                 Items to check
               </span>
-              <div className="flex overflow-hidden rounded-md border-[1.5px] border-[var(--line)]">
+              <div className="flex overflow-hidden rounded-md border border-[var(--line)]">
                 {[10, 25, 50].map((n) => (
                   <button
                     key={n}
@@ -1473,7 +1659,7 @@ export default function GhostFilterDashboard() {
                   <button
                     key={c.id}
                     onClick={() => pickChannel(c.label)}
-                    className={`flex items-center gap-1.5 rounded-md border-[1.5px] px-2.5 py-1.5 text-[10px] font-semibold transition-transform hover:-translate-y-0.5 ${
+                    className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-semibold transition-transform hover:-translate-y-0.5 ${
                       active
                         ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
                         : "border-[var(--line)] bg-[var(--panel)] text-zinc-400 hover:border-[var(--line-strong)]"
@@ -1489,7 +1675,7 @@ export default function GhostFilterDashboard() {
 
           <div className="order-1 border-b border-[var(--line)] bg-[var(--panel)] px-5 py-5">
             <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]">
                 <WandSparkles className="h-4 w-4" />
               </div>
               <div>
@@ -1522,7 +1708,7 @@ export default function GhostFilterDashboard() {
           <SectionLabel icon={FileSearch}>
             {sourceHint ? `Paste from ${sourceHint}` : MODE_COPY[inputMode].title}
           </SectionLabel>
-          <div className="flex flex-col gap-2.5 border-b-[1.5px] border-[var(--line)] px-5 py-4">
+          <div className="flex flex-col gap-2.5 border-b border-[var(--line)] px-5 py-4">
             {inputMode === "file" ? (
               <div>
                 <input
@@ -1584,7 +1770,7 @@ export default function GhostFilterDashboard() {
                 }
                 rows={inputMode === "link" ? 3 : 5}
                 aria-describedby="message-help"
-                className="w-full resize-y rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] px-3.5 py-3 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/15"
+                className="w-full resize-y rounded-md border border-[var(--line)] bg-[var(--input)] px-3.5 py-3 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/15"
               />
             )}
             <div className="flex items-start justify-between gap-3">
@@ -1615,7 +1801,7 @@ export default function GhostFilterDashboard() {
                       setMessageText(ex.text);
                     }}
                     disabled={analyzing}
-                    className="rounded-full border-[1.5px] border-[var(--line)] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-bright)] disabled:opacity-50"
+                    className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-bright)] disabled:opacity-50"
                   >
                     {ex.label}
                   </button>
@@ -1638,7 +1824,7 @@ export default function GhostFilterDashboard() {
               <button
                 onClick={handleAnalyze}
                 disabled={(inputMode === "file" ? !uploadedFile : !messageText.trim()) || analyzing}
-                className="ml-auto flex min-h-10 items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent)] px-5 py-2 text-[12px] font-extrabold uppercase tracking-wide text-[var(--accent-ink)] transition-all hover:bg-[var(--accent-bright)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[#1a1a22] disabled:text-zinc-600"
+                className="ml-auto flex min-h-10 items-center gap-2 rounded-md border border-[var(--accent)] bg-[var(--accent)] px-5 py-2 text-[12px] font-extrabold uppercase tracking-wide text-[var(--accent-ink)] transition-all hover:bg-[var(--accent-bright)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[#1a1a22] disabled:text-zinc-600"
                 style={(inputMode === "file" ? !uploadedFile : !messageText.trim()) || analyzing ? undefined : { boxShadow: "2.5px 2.5px 0 0 #0a4a3a" }}
               >
                 {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />}
@@ -1658,7 +1844,7 @@ export default function GhostFilterDashboard() {
             <span className="pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
               Message we checked
             </span>
-            <div className="relative min-h-[120px] rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] p-4 font-mono text-[12.5px] leading-[1.8] text-zinc-400">
+            <div className="relative min-h-[120px] rounded-md border border-[var(--line)] bg-[var(--input)] p-4 font-mono text-[12.5px] leading-[1.8] text-zinc-400">
               {selected && <VerdictStamp verdict={selected.verdict} />}
               {selected ? (
                 <p className="whitespace-pre-wrap">
@@ -1760,7 +1946,7 @@ export default function GhostFilterDashboard() {
           <SectionLabel icon={ShieldAlert}>Your result</SectionLabel>
           <div className="flex flex-col gap-4 px-4 py-4">
             <div
-              className={`rounded-lg border-[1.5px] bg-[var(--panel)] px-4 py-4 ${
+              className={`rounded-lg border bg-[var(--panel)] px-4 py-4 ${
                 tone === "critical" ? "border-[#ef4060]" : "border-[var(--line)]"
               }`}
             >
@@ -1790,7 +1976,7 @@ export default function GhostFilterDashboard() {
             </div>
 
             {selected && (
-              <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <div className="flex items-start gap-2.5">
                   <HelpCircle className={`mt-0.5 h-4 w-4 shrink-0 ${TONE_TEXT[tone]}`} />
                   <div>
@@ -1818,7 +2004,7 @@ export default function GhostFilterDashboard() {
             )}
 
             {selected && (
-              <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   What you should do
                 </span>
@@ -1827,7 +2013,7 @@ export default function GhostFilterDashboard() {
             )}
 
             {selected && (
-              <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] p-3.5">
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                     <ClipboardCheck className="h-3.5 w-3.5 text-[var(--accent)]" />
@@ -1934,7 +2120,7 @@ export default function GhostFilterDashboard() {
             </div>
 
             {selected && selected.flaggedPhrases.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   Phrases to notice
                 </span>
@@ -1950,7 +2136,7 @@ export default function GhostFilterDashboard() {
             )}
 
             {selected && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Database className="h-3 w-3" />
                   Link safety checks
@@ -1979,7 +2165,7 @@ export default function GhostFilterDashboard() {
             )}
 
             {selected && selected.screenshot && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <ImageIcon className="h-3 w-3" />
                   Safe page preview
@@ -1991,7 +2177,7 @@ export default function GhostFilterDashboard() {
                   // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable urlscan.io image
                   src={selected.screenshot.screenshotUrl}
                   alt="Sandboxed screenshot of the linked page"
-                  className="w-full rounded border-[1.5px] border-[var(--line)]"
+                  className="w-full rounded border border-[var(--line)]"
                   onError={(e) => {
                     const img = e.currentTarget;
                     img.style.display = "none";
@@ -2015,7 +2201,7 @@ export default function GhostFilterDashboard() {
             )}
 
             {selected && selected.attachmentIntel && selected.attachmentIntel.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+              <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Paperclip className="h-3 w-3" />
                   Attachment safety
@@ -2078,7 +2264,7 @@ export default function GhostFilterDashboard() {
               <span>Automated checks provide guidance, not a guarantee.</span>
             </div>
 
-            <p className="rounded-md border-[1.5px] border-[#f5a623]/40 bg-[#1a140a] px-3 py-2 text-[10px] leading-relaxed text-[#f5a623]">
+            <p className="rounded-md border border-[#f5a623]/40 bg-[#1a140a] px-3 py-2 text-[10px] leading-relaxed text-[#f5a623]">
               GhostFilter AI is in beta and can make mistakes. Treat results as guidance, not a
               final ruling — always use your own judgment before acting on any message.
             </p>
@@ -2086,7 +2272,7 @@ export default function GhostFilterDashboard() {
             {gmailConnection && (
               <button
                 onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
-                className="flex items-center justify-center gap-1.5 rounded-md border-[1.5px] border-[var(--line)] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                className="flex items-center justify-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
               >
                 <Trash2 className="h-3 w-3" />
                 Revoke Gmail Access
