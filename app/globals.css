@@ -3,6 +3,7 @@
 :root {
   --warn: #f5a623;
   --danger: #ef4060;
+  --danger-soft: #2a1017;
   --safe: #1fc88f;
   --info: #4f8cff;
   --violet: #9b7cff;
@@ -69,6 +70,7 @@
   --safe: #11855f;
   --warn: #b96800;
   --danger: #c92f4b;
+  --danger-soft: #fff0f3;
   --info: #2767d8;
   --violet: #7353c7;
   --ink: #f3f6f8;

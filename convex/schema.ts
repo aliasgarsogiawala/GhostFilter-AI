@@ -99,4 +99,13 @@ export default defineSchema({
   })
     .index("by_owner", ["ownerId"])
     .index("by_connection_external", ["connectionId", "externalId"]),
+
+  scanFeedback: defineTable({
+    ownerId: v.string(),
+    scanResultId: v.id("scanResults"),
+    expectedVerdict: v.union(v.literal("safe"), v.literal("suspicious"), v.literal("scam")),
+    note: v.optional(v.string()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_scan", ["scanResultId"]),
 });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleAlert,
   Code2,
@@ -35,6 +36,39 @@ const BENEFITS = [
     icon: FileCheck2,
     title: "Inspect the evidence",
     copy: "Email headers, attachments, sender identity, and authentication checks stay visible.",
+  },
+] as const;
+
+const FAQS = [
+  {
+    question: "What can I check with GhostFilter?",
+    answer:
+      "You can paste a text message, email, direct message, or link. You can also upload screenshots, PDFs, text files, and saved .eml emails.",
+  },
+  {
+    question: "Does GhostFilter open suspicious links?",
+    answer:
+      "No. Links are inspected from the server using redirect checks and external threat-intelligence services, so you do not need to open them in your own browser.",
+  },
+  {
+    question: "Can GhostFilter guarantee that a message is safe?",
+    answer:
+      "No automated checker can guarantee that. GhostFilter explains the evidence it found and gives you a safer next step, but you should still verify unexpected requests through an official channel.",
+  },
+  {
+    question: "Do I need to create an account?",
+    answer:
+      "No. You can use the scanner immediately. Scan history is tied to this browser unless a connected source is used.",
+  },
+  {
+    question: "What happens when I connect Gmail, Drive, or GitHub?",
+    answer:
+      "GhostFilter receives read-only access for scanning. It cannot send messages, edit files, delete content, or act on your behalf.",
+  },
+  {
+    question: "What should I do after a high-risk result?",
+    answer:
+      "Do not click, reply, pay, or share a code. Contact the person or organization through a separate method you already trust, such as its official app, website, or phone number.",
   },
 ] as const;
 
@@ -179,6 +213,9 @@ export default function LandingPage() {
             <a href="#privacy" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
               Privacy
             </a>
+            <a href="#faq" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 lg:block">
+              FAQ
+            </a>
             <AppearanceToggle />
             <Link
               href="/dashboard"
@@ -286,7 +323,32 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="bg-[var(--panel)]">
+        <section id="faq" className="border-b border-[var(--line)] bg-[var(--panel)]">
+          <div className="mx-auto grid max-w-6xl gap-9 px-5 py-14 lg:grid-cols-[.7fr_1.3fr] lg:px-8 lg:py-18">
+            <div>
+              <p className="text-[11px] font-medium text-[var(--accent)]">Frequently asked questions</p>
+              <h2 className="mt-3 max-w-sm text-3xl font-semibold tracking-[-0.035em] text-zinc-100">
+                Clear answers before you check anything.
+              </h2>
+              <p className="mt-4 max-w-sm text-[12px] leading-6 text-zinc-500">
+                GhostFilter is designed to help you decide safely, without pretending automated analysis is perfect.
+              </p>
+            </div>
+            <div className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+              {FAQS.map(({ question, answer }) => (
+                <details key={question} className="group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-5 text-[13px] font-semibold text-zinc-300">
+                    {question}
+                    <ChevronDown className="h-4 w-4 shrink-0 text-zinc-600 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <p className="max-w-2xl pb-5 pr-9 text-[11px] leading-6 text-zinc-500">{answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section>
           <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 px-5 py-12 sm:flex-row sm:items-center lg:px-8">
             <div>
               <h2 className="text-2xl font-semibold tracking-[-0.025em] text-zinc-100">Have a message that feels off?</h2>

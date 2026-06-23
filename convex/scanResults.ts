@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 
 export const insert = internalMutation({
   args: {
@@ -145,6 +145,73 @@ export const analyticsForOwner = query({
         createdAt: r._creationTime,
       })),
     };
+  },
+});
+
+export const remove = mutation({
+  args: { ownerId: v.string(), scanResultId: v.id("scanResults") },
+  handler: async (ctx, { ownerId, scanResultId }) => {
+    const row = await ctx.db.get(scanResultId);
+    if (!row || row.ownerId !== ownerId) throw new Error("Scan not found");
+
+    const feedback = await ctx.db
+      .query("scanFeedback")
+      .withIndex("by_scan", (q) => q.eq("scanResultId", scanResultId))
+      .collect();
+    await Promise.all(feedback.map((item) => ctx.db.delete(item._id)));
+    await ctx.db.delete(scanResultId);
+  },
+});
+
+export const clearForOwner = mutation({
+  args: { ownerId: v.string() },
+  handler: async (ctx, { ownerId }) => {
+    const [rows, feedback] = await Promise.all([
+      ctx.db
+        .query("scanResults")
+        .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+        .collect(),
+      ctx.db
+        .query("scanFeedback")
+        .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+        .collect(),
+    ]);
+    await Promise.all([
+      ...feedback.map((item) => ctx.db.delete(item._id)),
+      ...rows.map((row) => ctx.db.delete(row._id)),
+    ]);
+    return { deleted: rows.length };
+  },
+});
+
+export const submitFeedback = mutation({
+  args: {
+    ownerId: v.string(),
+    scanResultId: v.id("scanResults"),
+    expectedVerdict: v.union(v.literal("safe"), v.literal("suspicious"), v.literal("scam")),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.scanResultId);
+    if (!row || row.ownerId !== args.ownerId) throw new Error("Scan not found");
+
+    const existing = await ctx.db
+      .query("scanFeedback")
+      .withIndex("by_scan", (q) => q.eq("scanResultId", args.scanResultId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        expectedVerdict: args.expectedVerdict,
+        note: args.note?.slice(0, 500),
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("scanFeedback", {
+      ownerId: args.ownerId,
+      scanResultId: args.scanResultId,
+      expectedVerdict: args.expectedVerdict,
+      note: args.note?.slice(0, 500),
+    });
   },
 });
 

@@ -18,6 +18,7 @@ import {
   parseEmailForensics,
   type EmailForensics,
 } from "../lib/emailHeaders";
+import { extractTextFromUpload } from "../lib/fileExtraction";
 
 const SIGNAL_LABELS = [
   "Urgency Language",
@@ -194,7 +195,11 @@ export async function runPipeline(
         : "suspicious";
     return {
       verdict: fallbackVerdict,
-      confidence: fallbackVerdict === "scam" ? Math.max(85, Math.round(mlScore * 100)) : 50,
+      confidence: socialEngineering.combinedImpersonationPayment
+        ? 90
+        : fallbackVerdict === "scam"
+          ? Math.max(85, Math.round(mlScore * 100))
+          : 50,
       mlScore,
       summary:
         fallbackVerdict === "scam"
@@ -298,5 +303,37 @@ export const analyzeMessage = action({
       forensics: result.forensics ?? undefined,
     });
     return { ...result, id };
+  },
+});
+
+export const analyzeUpload = action({
+  args: {
+    ownerId: v.string(),
+    filename: v.string(),
+    mimeType: v.string(),
+    base64: v.string(),
+  },
+  handler: async (ctx, args): Promise<PipelineResult & { id: string; extractedText: string }> => {
+    const extractedText = await extractTextFromUpload(args);
+    const text = `Uploaded file: ${args.filename}\n\n${extractedText}`;
+    const result = await runPipeline(text);
+    const id: string = await ctx.runMutation(internal.scanResults.insert, {
+      ownerId: args.ownerId,
+      provider: "manual",
+      subject: args.filename.slice(0, 200),
+      snippet: text.slice(0, 4000),
+      verdict: result.verdict,
+      mlScore: result.mlScore,
+      confidence: result.confidence,
+      summary: result.summary,
+      recommendation: result.recommendation,
+      flaggedPhrases: result.flaggedPhrases,
+      signals: result.signals,
+      aiReviewed: result.aiReviewed,
+      linkIntel: result.linkIntel,
+      screenshot: result.screenshot ?? undefined,
+      forensics: result.forensics ?? undefined,
+    });
+    return { ...result, id, extractedText };
   },
 });

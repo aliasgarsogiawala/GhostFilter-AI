@@ -43,6 +43,15 @@ import {
   ChevronDown,
   Home,
   Settings2,
+  FileText,
+  Link2,
+  Upload,
+  Copy,
+  Download,
+  Share2,
+  RotateCcw,
+  ThumbsDown,
+  Check,
 } from "lucide-react";
 import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -55,6 +64,7 @@ type Tone = "clear" | "warn" | "critical";
 type ScanFilter = "all" | Verdict;
 type SourceFilter = "all" | ScanResultDoc["provider"];
 type ScanSort = "newest" | "risk" | "confidence";
+type InputMode = "message" | "email" | "link" | "file";
 
 interface ScanResultDoc {
   _id: string;
@@ -175,6 +185,68 @@ const EXAMPLES = [
     text: "Hey! Are we still on for lunch tomorrow at noon? Let me know if that still works for you.",
   },
 ];
+
+const INPUT_MODES = [
+  { id: "message", label: "Message", icon: MessageCircle },
+  { id: "email", label: "Email", icon: Mail },
+  { id: "link", label: "Link", icon: Link2 },
+  { id: "file", label: "File", icon: FileText },
+] as const;
+
+const MODE_COPY: Record<InputMode, { title: string; helper: string; placeholder: string }> = {
+  message: {
+    title: "Paste a message",
+    helper: "Include the sender and any links if possible.",
+    placeholder: "Paste an SMS, WhatsApp message, or direct message here…",
+  },
+  email: {
+    title: "Paste an email",
+    helper: "For the strongest check, include the sender, subject, body, and raw headers.",
+    placeholder: "Paste the email here, including its subject and sender…",
+  },
+  link: {
+    title: "Check a link",
+    helper: "Paste the full address. GhostFilter checks it without opening it in your browser.",
+    placeholder: "https://example.com/account-check",
+  },
+  file: {
+    title: "Upload a file",
+    helper: "Upload a screenshot, PDF, text file, or saved email. Maximum size: 8 MB.",
+    placeholder: "",
+  },
+};
+
+function detectInputMode(text: string): InputMode {
+  const trimmed = text.trim();
+  if (/^https?:\/\/\S+$/i.test(trimmed)) return "link";
+  if (/^(from|to|subject|reply-to|return-path):/im.test(trimmed)) return "email";
+  return "message";
+}
+
+function reportText(result: ScanResultDoc): string {
+  const reasons = result.flaggedPhrases.length
+    ? result.flaggedPhrases.map((item) => `- "${item.phrase}": ${item.reason}`).join("\n")
+    : "- No specific phrases were highlighted.";
+  return `GhostFilter scan report
+
+Result: ${friendlyVerdict(result.verdict)}
+Scam likelihood: ${Math.round(scamLikelihood(result))}%
+
+Why:
+${result.summary}
+
+What to do:
+${result.recommendation}
+
+Phrases to notice:
+${reasons}
+
+Checked content:
+${result.snippet}
+
+Generated ${new Date().toLocaleString()}
+GhostFilter results are guidance, not a guarantee.`;
+}
 
 // Channels where personal messages CAN'T be read by a web app (platform restriction) —
 // users paste these in manually instead. Honest, and still genuinely useful.
@@ -554,12 +626,18 @@ export default function GhostFilterDashboard() {
     | undefined;
 
   const analyzeMessage = useAction(api.pipeline.analyzeMessage);
+  const analyzeUpload = useAction(api.pipeline.analyzeUpload);
   const scanInbox = useAction(api.gmail.scanInbox);
   const scanDrive = useAction(api.drive.scanDrive);
   const scanGithub = useAction(api.github.scanNotifications);
   const disconnect = useMutation(api.connections.disconnect);
+  const removeScan = useMutation(api.scanResults.remove);
+  const clearScans = useMutation(api.scanResults.clearForOwner);
+  const submitFeedback = useMutation(api.scanResults.submitFeedback);
 
   const [messageText, setMessageText] = useState("");
+  const [inputMode, setInputMode] = useState<InputMode>("message");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [scanningKind, setScanningKind] = useState<"inbox" | "drive" | "github" | null>(null);
   const [scanDepth, setScanDepth] = useState(25);
@@ -573,7 +651,11 @@ export default function GhostFilterDashboard() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [scanSort, setScanSort] = useState<ScanSort>("newest");
   const [deepReviewOnly, setDeepReviewOnly] = useState(false);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const gmailConnection = connections?.find((c) => c.provider === "gmail" && c.status === "connected");
   const githubConnection = connections?.find((c) => c.provider === "github" && c.status === "connected");
@@ -614,13 +696,20 @@ export default function GhostFilterDashboard() {
       return b._creationTime - a._creationTime;
     });
 
+  const selectResult = (id: string | null) => {
+    setSelectedId(id);
+    setFeedbackOpen(false);
+    setFeedbackSent(false);
+    setActionStatus(null);
+  };
+
   const analyzeText = async (text: string) => {
     if (!ownerId || !text.trim() || analyzing) return;
     setAnalyzing(true);
     setAnalysisError(null);
     try {
       const result = await analyzeMessage({ text, ownerId });
-      setSelectedId(result.id);
+      selectResult(result.id);
     } catch (err) {
       setAnalysisError(err instanceof Error ? err.message : "We couldn't analyze that message. Please try again.");
     } finally {
@@ -628,9 +717,67 @@ export default function GhostFilterDashboard() {
     }
   };
 
-  const handleAnalyze = () => analyzeText(messageText);
+  const handleAnalyze = async () => {
+    if (inputMode !== "file") {
+      await analyzeText(messageText);
+      return;
+    }
+    if (!ownerId || !uploadedFile || analyzing) return;
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      if (uploadedFile.size > 8 * 1024 * 1024) {
+        throw new Error("That file is larger than 8 MB. Please upload a smaller file.");
+      }
+
+      if (
+        uploadedFile.type.startsWith("text/") ||
+        /\.(txt|eml)$/i.test(uploadedFile.name)
+      ) {
+        const text = await uploadedFile.text();
+        if (!text.trim()) throw new Error("That file doesn't contain readable text.");
+        setMessageText(text.slice(0, 20_000));
+        const result = await analyzeMessage({
+          text: `Uploaded file: ${uploadedFile.name}\n\n${text.slice(0, 20_000)}`,
+          ownerId,
+        });
+        selectResult(result.id);
+      } else {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const value = String(reader.result ?? "");
+            resolve(value.includes(",") ? value.split(",")[1] : value);
+          };
+          reader.onerror = () => reject(new Error("We couldn't read that file."));
+          reader.readAsDataURL(uploadedFile);
+        });
+        const result = await analyzeUpload({
+          ownerId,
+          filename: uploadedFile.name,
+          mimeType: uploadedFile.type || "application/octet-stream",
+          base64,
+        });
+        setMessageText(result.extractedText);
+        selectResult(result.id);
+      }
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "We couldn't analyze that file.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const chooseMode = (mode: InputMode) => {
+    setInputMode(mode);
+    setSourceHint(null);
+    setAnalysisError(null);
+    setUploadedFile(null);
+    if (mode !== "file") window.setTimeout(() => textareaRef.current?.focus(), 0);
+  };
 
   const pickChannel = (label: string) => {
+    setInputMode("message");
     setSourceHint(label);
     textareaRef.current?.focus();
     textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -638,8 +785,13 @@ export default function GhostFilterDashboard() {
 
   const startNewScan = () => {
     setMessageText("");
+    setInputMode("message");
+    setUploadedFile(null);
     setSourceHint(null);
     setAnalysisError(null);
+    setActionStatus(null);
+    setFeedbackOpen(false);
+    setFeedbackSent(false);
     textareaRef.current?.focus();
     textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -679,6 +831,74 @@ export default function GhostFilterDashboard() {
     );
     if (!ok) return;
     await disconnect({ connectionId: target as never, ownerId });
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!ownerId || !selected) return;
+    const ok = window.confirm("Delete this scan from your history?");
+    if (!ok) return;
+    await removeScan({ ownerId, scanResultId: selected._id as never });
+    selectResult(null);
+    setActionStatus("Scan deleted");
+  };
+
+  const handleClearHistory = async () => {
+    if (!ownerId || !scans?.length) return;
+    const ok = window.confirm(`Delete all ${scans.length} scans? This cannot be undone.`);
+    if (!ok) return;
+    await clearScans({ ownerId });
+    selectResult(null);
+    setActionStatus("History cleared");
+  };
+
+  const copyReport = async () => {
+    if (!selected) return;
+    await navigator.clipboard.writeText(reportText(selected));
+    setActionStatus("Report copied");
+  };
+
+  const downloadReport = () => {
+    if (!selected) return;
+    const blob = new Blob([reportText(selected)], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ghostfilter-report-${new Date(selected._creationTime).toISOString().slice(0, 10)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setActionStatus("Report downloaded");
+  };
+
+  const shareReport = async () => {
+    if (!selected) return;
+    const text = reportText(selected);
+    if (navigator.share) {
+      await navigator.share({ title: "GhostFilter scan report", text });
+      setActionStatus("Report shared");
+    } else {
+      await navigator.clipboard.writeText(text);
+      setActionStatus("Sharing isn't available here, so the report was copied");
+    }
+  };
+
+  const rescanSelected = () => {
+    if (!selected) return;
+    setInputMode(detectInputMode(selected.snippet));
+    setMessageText(selected.snippet.replace(/^Uploaded file: .+\n\n/, ""));
+    setUploadedFile(null);
+    setAnalysisError(null);
+    textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const sendFeedback = async (expectedVerdict: Verdict) => {
+    if (!ownerId || !selected) return;
+    await submitFeedback({
+      ownerId,
+      scanResultId: selected._id as never,
+      expectedVerdict,
+    });
+    setFeedbackSent(true);
+    setActionStatus("Thanks — your correction was saved");
   };
 
   const tone = selected ? verdictTone(selected.verdict) : "clear";
@@ -862,6 +1082,13 @@ export default function GhostFilterDashboard() {
                       <Plus className="h-3.5 w-3.5" />
                       Check another message
                     </button>
+                    <button
+                      onClick={handleClearHistory}
+                      className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-600 hover:text-[var(--danger)]"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear scan history
+                    </button>
                   </div>
                 )}
                 <div className="flex-1 overflow-y-auto px-2 py-2">
@@ -920,7 +1147,7 @@ export default function GhostFilterDashboard() {
                             </div>
                           )}
                           <button
-                            onClick={() => setSelectedId(s._id)}
+                            onClick={() => selectResult(s._id)}
                             aria-pressed={isSelected}
                             className={`mb-1.5 flex w-full items-start gap-2.5 rounded-md border-l-[3px] bg-[var(--panel)] px-2.5 py-2 text-left text-[11px] hover:bg-[#181820] ${
                               TONE_BORDER[t]
@@ -1111,41 +1338,110 @@ export default function GhostFilterDashboard() {
               <div>
                 <p className="text-[17px] font-semibold tracking-tight text-zinc-100">What would you like to check?</p>
                 <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
-                  Paste the message exactly as you received it. We’ll explain anything that looks unsafe.
+                  Choose a format, then add exactly what you received. We’ll turn it into a clear next step.
                 </p>
               </div>
+            </div>
+            <div className="mt-4 grid grid-cols-4 gap-1.5" role="tablist" aria-label="Type of content to check">
+              {INPUT_MODES.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={inputMode === id}
+                  onClick={() => chooseMode(id)}
+                  className={`flex min-h-10 items-center justify-center gap-1.5 rounded-md border text-[10px] font-semibold ${
+                    inputMode === id
+                      ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
+                      : "border-[var(--line)] bg-[var(--input)] text-zinc-500 hover:border-[var(--line-strong)] hover:text-zinc-300"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
           <div className="order-2">
           <SectionLabel icon={FileSearch}>
-            {sourceHint ? `Paste from ${sourceHint}` : "Paste your message"}
+            {sourceHint ? `Paste from ${sourceHint}` : MODE_COPY[inputMode].title}
           </SectionLabel>
           <div className="flex flex-col gap-2.5 border-b-[1.5px] border-[var(--line)] px-5 py-4">
-            <textarea
-              ref={textareaRef}
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  handleAnalyze();
+            {inputMode === "file" ? (
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.eml,.pdf,image/png,image/jpeg,image/webp,image/heic,image/heif"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setUploadedFile(file);
+                    setAnalysisError(null);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex min-h-[150px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-[var(--line-strong)] bg-[var(--input)] px-5 text-center hover:border-[var(--accent)]"
+                >
+                  {uploadedFile ? (
+                    <>
+                      <FileText className="h-7 w-7 text-[var(--accent)]" />
+                      <span className="mt-3 max-w-full truncate text-[13px] font-semibold text-zinc-200">
+                        {uploadedFile.name}
+                      </span>
+                      <span className="mt-1 text-[10px] text-zinc-500">
+                        {(uploadedFile.size / 1024).toFixed(0)} KB · Tap to choose another
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-7 w-7 text-zinc-500" />
+                      <span className="mt-3 text-[13px] font-semibold text-zinc-300">
+                        Choose a screenshot, PDF, text file, or saved email
+                      </span>
+                      <span className="mt-1 text-[10px] text-zinc-500">
+                        Images and PDFs are read securely before analysis
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                value={messageText}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setMessageText(value);
+                  if (value.trim()) setInputMode(detectInputMode(value));
+                }}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    handleAnalyze();
+                  }
+                }}
+                placeholder={
+                  sourceHint ? `Paste the ${sourceHint} message here…` : MODE_COPY[inputMode].placeholder
                 }
-              }}
-              placeholder={
-                sourceHint
-                  ? `Paste the ${sourceHint} message here…`
-                  : "Paste an email, text, or direct message here…"
-              }
-              rows={5}
-              aria-describedby="message-help"
-              className="w-full resize-y rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] px-3.5 py-3 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/15"
-            />
+                rows={inputMode === "link" ? 3 : 5}
+                aria-describedby="message-help"
+                className="w-full resize-y rounded-md border-[1.5px] border-[var(--line)] bg-[var(--input)] px-3.5 py-3 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/15"
+              />
+            )}
             <div className="flex items-start justify-between gap-3">
             <p id="message-help" className="text-[10px] leading-relaxed text-zinc-500">
-              Include the sender and any links if possible. Press{" "}
-              <span className="font-mono text-zinc-500">⌘/Ctrl + Enter</span> to check.
+              {MODE_COPY[inputMode].helper}
+              {inputMode !== "file" && (
+                <>
+                  {" "}Press <span className="font-mono text-zinc-500">⌘/Ctrl + Enter</span> to check.
+                </>
+              )}
             </p>
-              <span className="shrink-0 font-mono text-[10px] text-zinc-600">{messageText.length.toLocaleString()} chars</span>
+              {inputMode !== "file" && (
+                <span className="shrink-0 font-mono text-[10px] text-zinc-600">{messageText.length.toLocaleString()} chars</span>
+              )}
             </div>
             {analysisError && (
               <div className="rounded-md border border-[#ef4060]/60 bg-[#1a0c10] px-3 py-2 text-[11px] text-[#ef4060]" role="alert">
@@ -1153,24 +1449,25 @@ export default function GhostFilterDashboard() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-1.5">
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex.label}
-                  onClick={() => {
-                    setSourceHint(null);
-                    setMessageText(ex.text);
-                    analyzeText(ex.text);
-                  }}
-                  disabled={analyzing}
-                  className="rounded-full border-[1.5px] border-[var(--line)] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-bright)] disabled:opacity-50"
-                >
-                  {ex.label}
-                </button>
-              ))}
-              {messageText && (
+              {inputMode !== "file" && EXAMPLES.map((ex) => (
+                  <button
+                    key={ex.label}
+                    onClick={() => {
+                      setSourceHint(null);
+                      setInputMode(detectInputMode(ex.text));
+                      setMessageText(ex.text);
+                    }}
+                    disabled={analyzing}
+                    className="rounded-full border-[1.5px] border-[var(--line)] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-bright)] disabled:opacity-50"
+                  >
+                    {ex.label}
+                  </button>
+                ))}
+              {(messageText || uploadedFile) && (
                 <button
                   onClick={() => {
                     setMessageText("");
+                    setUploadedFile(null);
                     setSourceHint(null);
                     setAnalysisError(null);
                     textareaRef.current?.focus();
@@ -1183,12 +1480,12 @@ export default function GhostFilterDashboard() {
               )}
               <button
                 onClick={handleAnalyze}
-                disabled={!messageText.trim() || analyzing}
+                disabled={(inputMode === "file" ? !uploadedFile : !messageText.trim()) || analyzing}
                 className="ml-auto flex min-h-10 items-center gap-2 rounded-md border-[1.5px] border-[var(--accent)] bg-[var(--accent)] px-5 py-2 text-[12px] font-extrabold uppercase tracking-wide text-[var(--accent-ink)] transition-all hover:bg-[var(--accent-bright)] active:translate-x-[1.5px] active:translate-y-[1.5px] active:shadow-none disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[#1a1a22] disabled:text-zinc-600"
-                style={!messageText.trim() || analyzing ? undefined : { boxShadow: "2.5px 2.5px 0 0 #0a4a3a" }}
+                style={(inputMode === "file" ? !uploadedFile : !messageText.trim()) || analyzing ? undefined : { boxShadow: "2.5px 2.5px 0 0 #0a4a3a" }}
               >
                 {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />}
-                {analyzing ? "Checking" : "Check message"}
+                {analyzing ? "Checking" : inputMode === "file" ? "Check file" : "Check now"}
               </button>
             </div>
           </div>
@@ -1344,11 +1641,40 @@ export default function GhostFilterDashboard() {
               </div>
             )}
 
+            {selected && (
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3">
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button onClick={copyReport} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-md border border-[var(--line)] bg-[var(--input)] text-[9px] font-semibold text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]">
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </button>
+                  <button onClick={downloadReport} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-md border border-[var(--line)] bg-[var(--input)] text-[9px] font-semibold text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]">
+                    <Download className="h-3.5 w-3.5" />
+                    Download
+                  </button>
+                  <button onClick={shareReport} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-md border border-[var(--line)] bg-[var(--input)] text-[9px] font-semibold text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]">
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share
+                  </button>
+                  <button onClick={rescanSelected} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-md border border-[var(--line)] bg-[var(--input)] text-[9px] font-semibold text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Rescan
+                  </button>
+                </div>
+                {actionStatus && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[10px] text-[var(--accent-bright)]" role="status">
+                    <Check className="h-3 w-3" />
+                    {actionStatus}
+                  </p>
+                )}
+              </div>
+            )}
+
             <details className="group rounded-lg border border-[var(--line)] bg-[var(--panel)]">
               <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5">
                 <span className="flex items-center gap-2 text-[11px] font-semibold text-zinc-400">
                   <Settings2 className="h-4 w-4 text-zinc-500" />
-                  More details
+                  Technical details
                 </span>
                 <ChevronDown className="h-4 w-4 text-zinc-600 transition-transform group-open:rotate-180" />
               </summary>
@@ -1472,6 +1798,43 @@ export default function GhostFilterDashboard() {
               </div>
             </details>
 
+            {selected && (
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
+                {feedbackSent ? (
+                  <div className="flex items-start gap-2 text-[11px] text-zinc-400">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
+                    <div>
+                      <p className="font-semibold text-zinc-300">Correction saved</p>
+                      <p className="mt-1 text-[10px] text-zinc-500">This helps improve future GhostFilter evaluations.</p>
+                    </div>
+                  </div>
+                ) : feedbackOpen ? (
+                  <div>
+                    <p className="text-[11px] font-semibold text-zinc-300">What should the result have been?</p>
+                    <div className="mt-2 grid grid-cols-3 gap-1.5">
+                      {(["safe", "suspicious", "scam"] as const).map((verdict) => (
+                        <button
+                          key={verdict}
+                          onClick={() => sendFeedback(verdict)}
+                          className="rounded-md border border-[var(--line)] bg-[var(--input)] px-2 py-2 text-[9px] font-bold uppercase text-zinc-500 hover:border-[var(--accent)] hover:text-zinc-200"
+                        >
+                          {friendlyVerdict(verdict)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setFeedbackOpen(true)}
+                    className="flex w-full items-center justify-center gap-2 text-[10px] font-semibold text-zinc-500 hover:text-zinc-300"
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5" />
+                    Is this result wrong?
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 px-1 text-[10px] text-zinc-600">
               <ShieldCheck className="h-3 w-3" />
               <span>Automated checks provide guidance, not a guarantee.</span>
@@ -1489,6 +1852,15 @@ export default function GhostFilterDashboard() {
               >
                 <Trash2 className="h-3 w-3" />
                 Revoke Gmail Access
+              </button>
+            )}
+            {selected && (
+              <button
+                onClick={handleDeleteSelected}
+                className="flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[10px] font-semibold text-zinc-600 hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete this scan
               </button>
             )}
           </div>
