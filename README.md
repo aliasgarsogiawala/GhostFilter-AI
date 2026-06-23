@@ -48,10 +48,18 @@ Open [http://localhost:3000](http://localhost:3000).
 ### Retrain the classifier
 
 ```bash
-npm run train-classifier
+scripts/download-corpus.sh   # fetches the SpamAssassin email corpus (gitignored, ~42MB)
+npm run train-classifier     # regenerates lib/ml-weights.json
 ```
 
-Regenerates `lib/ml-weights.json` from `scripts/data/sms-spam.csv`.
+The classifier trains on a combined corpus so it generalizes beyond SMS:
+- `scripts/data/sms-spam.csv` — the SMS Spam Collection (short text messages).
+- `scripts/data/spamassassin/` — the SpamAssassin public corpus of real emails, including
+  `hard_ham` (legitimate-but-promotional newsletters/marketing). That class is what teaches
+  the model not to flag legitimate newsletters (e.g. daily.dev) as spam.
+
+Only the trained weights (`lib/ml-weights.json`) are committed; the raw corpus is gitignored
+and re-downloadable via `scripts/download-corpus.sh`.
 
 ## Project structure
 

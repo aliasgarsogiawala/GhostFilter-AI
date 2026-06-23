@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ML training corpus (re-downloadable from spamassassin.apache.org/old/publiccorpus/)
+scripts/data/spamassassin/

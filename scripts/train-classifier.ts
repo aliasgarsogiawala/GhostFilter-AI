@@ -1,21 +1,36 @@
 // Offline training script for the lightweight scam/spam triage classifier.
 // Run with: npm run train-classifier
 //
-// Trains a logistic regression (hand-rolled gradient descent, no ML deps)
-// on the public SMS Spam Collection dataset, combining handcrafted signal
-// features with a small bag-of-words vocabulary, then exports the learned
-// weights to lib/ml-weights.json for runtime inference (lib/ml-classifier.ts).
+// Trains a logistic regression (hand-rolled gradient descent, no ML deps) on a
+// combined corpus so it generalizes beyond SMS:
+//   - SMS Spam Collection (scripts/data/sms-spam.csv)           — short text messages
+//   - SpamAssassin public corpus (scripts/data/spamassassin/)   — real emails, incl.
+//     hard_ham = legitimate-but-promotional newsletters/marketing (the false-positive
+//     class that an SMS-only model gets wrong).
+// The SpamAssassin corpus is gitignored; re-download it with:
+//   scripts/download-corpus.sh   (or from spamassassin.apache.org/old/publiccorpus/)
+// Exports learned weights to lib/ml-weights.json for runtime inference (lib/ml-classifier.ts).
 
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { extractFeatureVector, tokenize, HANDCRAFTED_KEYS } from "../lib/features";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_PATH = join(__dirname, "data", "sms-spam.csv");
+const SMS_PATH = join(__dirname, "data", "sms-spam.csv");
+const SPAMASSASSIN_DIR = join(__dirname, "data", "spamassassin");
 const OUTPUT_PATH = join(__dirname, "..", "lib", "ml-weights.json");
 
-const VOCAB_SIZE = 40;
+// SpamAssassin folders and their label (1 = spam/scam, 0 = legitimate).
+const SA_FOLDERS: { dir: string; label: 0 | 1 }[] = [
+  { dir: "easy_ham", label: 0 },
+  { dir: "easy_ham_2", label: 0 },
+  { dir: "hard_ham", label: 0 }, // legit but promotional — teaches the model not to over-flag
+  { dir: "spam", label: 1 },
+  { dir: "spam_2", label: 1 },
+];
+
+const VOCAB_SIZE = 150;
 const EPOCHS = 600;
 const LEARNING_RATE = 0.3;
 const L2 = 0.001;
@@ -23,6 +38,7 @@ const L2 = 0.001;
 interface Row {
   label: 0 | 1; // 1 = spam
   text: string;
+  source: "sms" | "email";
 }
 
 function parseCsv(raw: string): Row[] {
@@ -58,7 +74,57 @@ function parseCsv(raw: string): Row[] {
       text = rest.split(",")[0];
     }
     if (label !== "ham" && label !== "spam") continue;
-    rows.push({ label: label === "spam" ? 1 : 0, text });
+    rows.push({ label: label === "spam" ? 1 : 0, text, source: "sms" });
+  }
+  return rows;
+}
+
+/** Extracts the Subject + plain-text body from a raw RFC822 email file, mirroring how the
+ *  live Gmail scanner builds "Subject: ...\n\n body" so train-time and runtime text match. */
+function parseEmail(raw: string): string {
+  const sepIdx = raw.search(/\r?\n\r?\n/);
+  const headerBlock = sepIdx === -1 ? raw : raw.slice(0, sepIdx);
+  let body = sepIdx === -1 ? "" : raw.slice(sepIdx).trim();
+
+  const subjectMatch = headerBlock.match(/^subject:\s*(.*)$/im);
+  const subject = subjectMatch ? subjectMatch[1].trim() : "";
+
+  // Strip HTML tags if the body is HTML, collapse whitespace, and cap length so a single
+  // huge email can't dominate the bag-of-words counts.
+  if (/<html|<body|<div|<table|<a\s/i.test(body)) {
+    body = body
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<[^>]+>/g, " ");
+  }
+  body = body.replace(/\s+/g, " ").trim().slice(0, 4000);
+  return `Subject: ${subject}\n\n${body}`;
+}
+
+function loadEmails(): Row[] {
+  if (!existsSync(SPAMASSASSIN_DIR)) {
+    console.warn(
+      `\n⚠ SpamAssassin corpus not found at ${SPAMASSASSIN_DIR} — training on SMS only.\n` +
+        `  Run scripts/download-corpus.sh to fetch it for a much better model.\n`
+    );
+    return [];
+  }
+  const rows: Row[] = [];
+  for (const { dir, label } of SA_FOLDERS) {
+    const full = join(SPAMASSASSIN_DIR, dir);
+    if (!existsSync(full)) continue;
+    for (const file of readdirSync(full)) {
+      if (file.startsWith(".") || file === "cmds") continue;
+      try {
+        const raw = readFileSync(join(full, file), "latin1"); // emails are often non-UTF8
+        const text = parseEmail(raw);
+        if (text.replace(/^Subject:\s*/, "").trim().length > 5) {
+          rows.push({ label, text, source: "email" });
+        }
+      } catch {
+        // skip unreadable files
+      }
+    }
   }
   return rows;
 }
@@ -184,17 +250,44 @@ function shuffle<T>(arr: T[], seed = 42): T[] {
   return a;
 }
 
+function evaluateSubset(
+  rows: Row[],
+  predicate: (r: Row) => boolean,
+  vocab: string[],
+  mean: number[],
+  std: number[],
+  weights: number[],
+  bias: number,
+  label: string
+) {
+  const subset = rows.filter(predicate);
+  if (!subset.length) return;
+  const X = subset.map((r) => extractFeatureVector(r.text, vocab).map((v, j) => (v - mean[j]) / std[j]));
+  const y = subset.map((r) => r.label);
+  const m = evaluate(X, y, weights, bias);
+  console.log(`  ${label} (n=${subset.length}):`, {
+    accuracy: +m.accuracy.toFixed(4),
+    precision: +m.precision.toFixed(4),
+    recall: +m.recall.toFixed(4),
+  });
+}
+
 function main() {
-  const raw = readFileSync(DATA_PATH, "utf-8");
-  const rows = shuffle(parseCsv(raw));
-  console.log(`Loaded ${rows.length} labeled messages`);
+  const sms = parseCsv(readFileSync(SMS_PATH, "utf-8"));
+  const emails = loadEmails();
+  const rows = shuffle([...sms, ...emails]);
+  const spamCount = rows.filter((r) => r.label === 1).length;
+  console.log(
+    `Loaded ${rows.length} labeled messages (${sms.length} SMS + ${emails.length} email); ` +
+      `${spamCount} spam / ${rows.length - spamCount} legit`
+  );
 
   const splitIdx = Math.floor(rows.length * 0.8);
   const trainRows = rows.slice(0, splitIdx);
   const testRows = rows.slice(splitIdx);
 
   const vocab = buildVocab(trainRows, VOCAB_SIZE);
-  console.log("Vocab:", vocab.join(", "));
+  console.log(`Vocab (${vocab.length}):`, vocab.join(", "));
 
   const Xtrain = trainRows.map((r) => extractFeatureVector(r.text, vocab));
   const ytrain = trainRows.map((r) => r.label);
@@ -210,6 +303,13 @@ function main() {
   const testMetrics = evaluate(XtestStd, ytest, weights, bias);
   console.log("Train:", trainMetrics);
   console.log("Test:", testMetrics);
+
+  // Per-slice test metrics — especially the legitimate-email recall, which is what the
+  // SMS-only model was failing (flagging newsletters as spam).
+  console.log("Per-source test breakdown:");
+  evaluateSubset(testRows, (r) => r.source === "sms", vocab, mean, std, weights, bias, "SMS");
+  evaluateSubset(testRows, (r) => r.source === "email", vocab, mean, std, weights, bias, "Email");
+  evaluateSubset(testRows, (r) => r.source === "email" && r.label === 0, vocab, mean, std, weights, bias, "Legit email (want high accuracy = few false positives)");
 
   const output = {
     vocab,

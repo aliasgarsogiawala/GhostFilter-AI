@@ -23,5 +23,9 @@ export function scoreMessage(text: string): number {
   return sigmoid(z);
 }
 
-/** Above this score, the message gets escalated to a Gemini deep-review. */
-export const ML_REVIEW_THRESHOLD = 0.35;
+/** Above this score, the message gets escalated to a Gemini deep-review. Tuned against the
+ *  combined SMS+email model: legit newsletters score ~0.15-0.20, so 0.30 leaves margin to
+ *  keep them un-escalated (instant "safe", no Gemini call) while still catching borderline
+ *  phishing. Messages with a hard heuristic hit (lookalike domain, flagged link, injection)
+ *  escalate regardless of this score. */
+export const ML_REVIEW_THRESHOLD = 0.3;
