@@ -43,7 +43,8 @@ npx convex dev   # keep running in its own terminal — watches convex/ and push
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) for the public landing page,
+then enter the scanner at [http://localhost:3000/dashboard](http://localhost:3000/dashboard).
 
 ### Retrain the classifier
 
@@ -63,7 +64,8 @@ and re-downloadable via `scripts/download-corpus.sh`.
 
 ## Project structure
 
-- `app/page.tsx` — the dashboard (Connect Accounts, paste-box analyzer, reactive scan history, verdict/signal breakdown).
+- `app/page.tsx` and `app/LandingPage.tsx` — the public landing page and branded splash experience.
+- `app/dashboard/page.tsx` — the scanner workspace (connected accounts, paste-box analyzer, reactive scan history, verdict/signal breakdown).
 - `app/api/auth/google/` — Gmail OAuth connect + callback routes.
 - `convex/` — schema, the shared analysis pipeline, the Gmail scan action, and the connections/scanResults tables.
 - `lib/` — heuristics, the ML classifier, the Gemini wrapper, and shared helpers used by both the manual analyzer and the Gmail scanner.

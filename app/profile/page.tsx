@@ -91,7 +91,7 @@ export default function ProfilePage() {
       <header className="relative z-10 flex items-center justify-between border-b-[1.5px] border-[var(--line)] bg-[var(--panel)] px-5 py-3.5">
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href="/dashboard"
             className="flex items-center gap-1.5 rounded-md border-[1.5px] border-[var(--line-strong)] bg-[var(--ink)] px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
@@ -114,7 +114,7 @@ export default function ProfilePage() {
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 text-center">
             <ScanSearch className="h-7 w-7 text-zinc-700" />
             <p className="text-sm text-zinc-500">No scans yet.</p>
-            <Link href="/" className="text-[12px] font-bold text-[var(--accent-bright)] hover:underline">
+            <Link href="/dashboard" className="text-[12px] font-bold text-[var(--accent-bright)] hover:underline">
               Go analyze your first message →
             </Link>
           </div>

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const error = req.nextUrl.searchParams.get("error");
 
   if (error || !code || !ownerId) {
-    return NextResponse.redirect(new URL("/?connect=error", req.url));
+    return NextResponse.redirect(new URL("/dashboard?connect=error", req.url));
   }
 
   try {
@@ -34,9 +34,9 @@ export async function GET(req: NextRequest) {
       accountName: login,
     });
 
-    return NextResponse.redirect(new URL("/?connect=success", req.url));
+    return NextResponse.redirect(new URL("/dashboard?connect=success", req.url));
   } catch (err) {
     console.error("GitHub OAuth callback failed:", err);
-    return NextResponse.redirect(new URL("/?connect=error", req.url));
+    return NextResponse.redirect(new URL("/dashboard?connect=error", req.url));
   }
 }
