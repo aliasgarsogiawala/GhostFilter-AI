@@ -7,7 +7,6 @@ import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motio
 import {
   Mail,
   Code2,
-  MessageSquare,
   Cloud,
   Plug,
   Unlink,
@@ -25,6 +24,13 @@ import {
   Image as ImageIcon,
   Paperclip,
   Database,
+  Hash,
+  MessagesSquare,
+  MessageCircle,
+  Send,
+  Camera,
+  Smartphone,
+  Briefcase,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useOwnerId } from "@/lib/useOwnerId";
@@ -109,7 +115,13 @@ const PROVIDERS = [
   { id: "gmail", label: "Gmail", icon: Mail, live: true },
   { id: "outlook", label: "Outlook", icon: Mail, live: false },
   { id: "github", label: "GitHub", icon: Code2, live: false },
-  { id: "slack", label: "Slack", icon: MessageSquare, live: false },
+  { id: "slack", label: "Slack", icon: Hash, live: false },
+  { id: "discord", label: "Discord", icon: MessagesSquare, live: false },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, live: false },
+  { id: "telegram", label: "Telegram", icon: Send, live: false },
+  { id: "instagram", label: "Instagram DMs", icon: Camera, live: false },
+  { id: "sms", label: "SMS / Texts", icon: Smartphone, live: false },
+  { id: "linkedin", label: "LinkedIn", icon: Briefcase, live: false },
   { id: "drive", label: "Google Drive", icon: Cloud, live: false },
 ] as const;
 
@@ -430,6 +442,9 @@ export default function GhostFilterDashboard() {
               </h1>
               <span className="rounded border-[1.5px] border-[#34343e] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
                 Scam &amp; Phishing Shield
+              </span>
+              <span className="rounded border-[1.5px] border-[#f5a623] bg-[#1a140a] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#f5a623]">
+                Beta
               </span>
             </div>
             <p className="text-[11px] text-zinc-500">
@@ -764,6 +779,11 @@ export default function GhostFilterDashboard() {
                 {selected && !selected.aiReviewed && " (not invoked)"}
               </span>
             </div>
+
+            <p className="rounded-md border-[1.5px] border-[#f5a623]/40 bg-[#1a140a] px-3 py-2 text-[10px] leading-relaxed text-[#f5a623]">
+              GhostFilter AI is in beta and can make mistakes. Treat results as guidance, not a
+              final ruling — always use your own judgment before acting on any message.
+            </p>
 
             {gmailConnection && (
               <button

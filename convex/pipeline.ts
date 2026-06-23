@@ -134,18 +134,26 @@ export async function runPipeline(
   let ai: GeminiVerdict;
   try {
     ai = await reviewWithGemini(text, mlScore, links, injection);
-  } catch (err) {
+  } catch {
     // Gemini failed (missing key, rate limit, network) — degrade to a heuristic-only
     // verdict instead of crashing the whole analysis.
     const [linkIntel, screenshot] = await Promise.all([intelPromise, screenshotPromise]);
+    // Without the AI reviewer we MUST NOT call something a "scam" off the SMS-trained
+    // triage score alone — that's what flags legitimate newsletters. Only hard, corroborated
+    // signals (prompt-injection or a threat-intel-flagged link) justify "scam" here; everything
+    // else that was escalated is at most "suspicious".
+    const linkFlaggedByIntel = linkIntel.some((li) => li.vtMalicious > 0 || li.vtSuspicious > 0);
+    const fallbackVerdict: "suspicious" | "scam" =
+      injection.detected || linkFlaggedByIntel ? "scam" : "suspicious";
     return {
-      verdict: injection.detected ? "scam" : hasHardHeuristicHit ? "suspicious" : mlScore >= 0.7 ? "scam" : "suspicious",
-      confidence: Math.round(mlScore * 100),
+      verdict: fallbackVerdict,
+      confidence: fallbackVerdict === "scam" ? Math.max(85, Math.round(mlScore * 100)) : 50,
       mlScore,
-      summary: `AI review unavailable (${
-        err instanceof Error ? err.message : "unknown error"
-      }); showing triage-only result.`,
-      recommendation: "Treat this message with caution and verify through an official channel before acting on it.",
+      summary:
+        fallbackVerdict === "scam"
+          ? "Concrete fraud indicators were found, but full AI review was temporarily unavailable — treat this as a scam."
+          : "Our AI reviewer was temporarily unavailable, so this is a cautious triage-only result, not a confirmed scam. Re-run the analysis in a moment for a full verdict.",
+      recommendation: "Don't act on any request for money, passwords, or codes until you've verified it through an official channel you trust.",
       flaggedPhrases: [],
       signals: baselineSignals(mlScore, links, lowerText, injection),
       aiReviewed: false,
