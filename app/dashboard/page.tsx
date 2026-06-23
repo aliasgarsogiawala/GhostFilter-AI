@@ -52,6 +52,12 @@ import {
   RotateCcw,
   ThumbsDown,
   Check,
+  AlertTriangle,
+  BookOpen,
+  ClipboardCheck,
+  Flag,
+  HelpCircle,
+  PhoneCall,
 } from "lucide-react";
 import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -247,6 +253,100 @@ ${result.snippet}
 Generated ${new Date().toLocaleString()}
 GhostFilter results are guidance, not a guarantee.`;
 }
+
+function plainEnglishResult(result: ScanResultDoc): { title: string; copy: string } {
+  if (result.verdict === "scam") {
+    return {
+      title: "Treat this like a scam.",
+      copy:
+        "The message has enough warning signs that the safest move is to stop, verify somewhere else, and avoid sending money, passwords, codes, or personal details.",
+    };
+  }
+  if (result.verdict === "suspicious") {
+    return {
+      title: "Pause before you act.",
+      copy:
+        "Something about this message deserves a second look. Do not use its links or contact details until you verify the request through a source you already trust.",
+    };
+  }
+  return {
+    title: "Nothing major stood out.",
+    copy:
+      "GhostFilter did not find strong scam patterns here. Still be careful if the message asks for money, login codes, passwords, or urgent action.",
+  };
+}
+
+function riskPattern(result: ScanResultDoc): { label: string; copy: string } {
+  const text = `${result.snippet} ${result.summary} ${result.recommendation}`.toLowerCase();
+  if (text.includes("money") || text.includes("payment") || text.includes("rupees") || text.includes("bank")) {
+    return {
+      label: "Money request",
+      copy: "Scams often create urgency around payment, refunds, delivery fees, friends, celebrities, or family emergencies.",
+    };
+  }
+  if (text.includes("password") || text.includes("login") || text.includes("account") || text.includes("verify")) {
+    return {
+      label: "Account takeover",
+      copy: "The goal may be to push you into a fake login page or make you reveal a password or one-time code.",
+    };
+  }
+  if (result.linkIntel?.length || result.screenshot) {
+    return {
+      label: "Link risk",
+      copy: "The risky part may be hidden behind a link, shortened URL, redirect, or unfamiliar domain.",
+    };
+  }
+  if (result.forensics?.indicators.length) {
+    return {
+      label: "Sender mismatch",
+      copy: "The visible sender and the technical sending path may not fully agree, which can happen in impersonation.",
+    };
+  }
+  return {
+    label: "Social pressure",
+    copy: "A lot of scams work by rushing you, confusing you, or making you feel rude for double-checking.",
+  };
+}
+
+function safetyActions(result: ScanResultDoc): { label: string; detail: string; urgent?: boolean }[] {
+  if (result.verdict === "safe") {
+    return [
+      { label: "Still avoid sharing private codes", detail: "No real support agent needs your OTP, PIN, or password." },
+      { label: "Use official links for accounts", detail: "If money or login details appear later, open the official app or site yourself." },
+      { label: "Save the report if unsure", detail: "Copy or share the report with someone you trust before acting." },
+    ];
+  }
+
+  return [
+    { label: "Do not click or reply", detail: "Leave links, attachments, and phone numbers in the message alone.", urgent: result.verdict === "scam" },
+    { label: "Verify somewhere else", detail: "Use an official app, saved contact, known phone number, or in-person confirmation." },
+    { label: "Protect your accounts", detail: "If you already shared details, change passwords and contact your bank or service provider." },
+    { label: "Report and block", detail: "Report the sender in the app, then block them so the pressure stops." },
+  ];
+}
+
+function verificationMessage(result: ScanResultDoc): string {
+  const pattern = riskPattern(result).label.toLowerCase();
+  return `Hey, I received a message that looks like a possible ${pattern}. I’m not going to use the link or reply there. Can you confirm through this trusted chat/number whether the request is real?`;
+}
+
+const SAFETY_KIT = [
+  {
+    icon: PhoneCall,
+    title: "Verify outside the message",
+    copy: "Call a saved number or open the official app. Never trust a number or link sent inside the suspicious message.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Never share secret codes",
+    copy: "OTP, PIN, password reset links, and card details should stay private even if the sender sounds urgent.",
+  },
+  {
+    icon: Flag,
+    title: "If you already acted",
+    copy: "Freeze cards if needed, change passwords, sign out other sessions, then report the sender.",
+  },
+] as const;
 
 // Channels where personal messages CAN'T be read by a web app (platform restriction) —
 // users paste these in manually instead. Honest, and still genuinely useful.
@@ -654,6 +754,7 @@ export default function GhostFilterDashboard() {
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [completedSafetyActions, setCompletedSafetyActions] = useState<Record<string, boolean>>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -851,10 +952,28 @@ export default function GhostFilterDashboard() {
     setActionStatus("History cleared");
   };
 
+  const copyTextToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const fallback = document.createElement("textarea");
+      fallback.value = text;
+      fallback.setAttribute("readonly", "");
+      fallback.style.position = "fixed";
+      fallback.style.left = "-9999px";
+      document.body.appendChild(fallback);
+      fallback.select();
+      const copied = document.execCommand("copy");
+      fallback.remove();
+      return copied;
+    }
+  };
+
   const copyReport = async () => {
     if (!selected) return;
-    await navigator.clipboard.writeText(reportText(selected));
-    setActionStatus("Report copied");
+    const copied = await copyTextToClipboard(reportText(selected));
+    setActionStatus(copied ? "Report copied" : "Copy failed — use Download instead");
   };
 
   const downloadReport = () => {
@@ -876,9 +995,21 @@ export default function GhostFilterDashboard() {
       await navigator.share({ title: "GhostFilter scan report", text });
       setActionStatus("Report shared");
     } else {
-      await navigator.clipboard.writeText(text);
-      setActionStatus("Sharing isn't available here, so the report was copied");
+      const copied = await copyTextToClipboard(text);
+      setActionStatus(copied ? "Sharing isn't available here, so the report was copied" : "Sharing isn't available here");
     }
+  };
+
+  const copyVerification = async () => {
+    if (!selected) return;
+    const copied = await copyTextToClipboard(verificationMessage(selected));
+    setActionStatus(copied ? "Verification message copied" : "Copy failed — select and copy the message manually");
+  };
+
+  const toggleSafetyAction = (index: number) => {
+    if (!selected) return;
+    const key = `${selected._id}:${index}`;
+    setCompletedSafetyActions((current) => ({ ...current, [key]: !current[key] }));
   };
 
   const rescanSelected = () => {
@@ -904,6 +1035,12 @@ export default function GhostFilterDashboard() {
   const tone = selected ? verdictTone(selected.verdict) : "clear";
   const gaugeValue = selected ? scamLikelihood(selected) : 0;
   const segments = selected ? buildHighlightSegments(selected.snippet, selected.flaggedPhrases) : [];
+  const plainResult = selected ? plainEnglishResult(selected) : null;
+  const pattern = selected ? riskPattern(selected) : null;
+  const actionPlan = selected ? safetyActions(selected) : [];
+  const completedPlanCount = selected
+    ? actionPlan.filter((_, index) => completedSafetyActions[`${selected._id}:${index}`]).length
+    : 0;
 
   return (
     <div className="dashboard-page min-h-screen w-full bg-[var(--ink)] text-zinc-300">
@@ -1091,6 +1228,26 @@ export default function GhostFilterDashboard() {
                     </button>
                   </div>
                 )}
+                <details className="mx-2 mt-2 rounded-lg border border-[var(--line)] bg-[var(--panel)]">
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
+                    <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                      <BookOpen className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      Safety kit
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-zinc-600" />
+                  </summary>
+                  <div className="space-y-2 border-t border-[var(--line)] p-2.5">
+                    {SAFETY_KIT.map(({ icon: Icon, title, copy }) => (
+                      <div key={title} className="rounded-md border border-[var(--line)] bg-[var(--input)] p-2.5">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-3.5 w-3.5 text-[var(--accent-bright)]" />
+                          <p className="text-[11px] font-semibold text-zinc-300">{title}</p>
+                        </div>
+                        <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{copy}</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
                 <div className="flex-1 overflow-y-auto px-2 py-2">
                   {!scans?.length && (
                     <div className="mx-1 mt-1 rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] p-4">
@@ -1634,10 +1791,91 @@ export default function GhostFilterDashboard() {
 
             {selected && (
               <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+                <div className="flex items-start gap-2.5">
+                  <HelpCircle className={`mt-0.5 h-4 w-4 shrink-0 ${TONE_TEXT[tone]}`} />
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                      In plain English
+                    </span>
+                    <p className="mt-1.5 text-[13px] font-semibold leading-snug text-zinc-100">
+                      {plainResult?.title}
+                    </p>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
+                      {plainResult?.copy}
+                    </p>
+                  </div>
+                </div>
+                {pattern && (
+                  <div className="mt-3 rounded-md border border-[var(--line)] bg-[var(--input)] p-3">
+                    <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                      <AlertTriangle className="h-3.5 w-3.5 text-[var(--warn)]" />
+                      Pattern spotted: {pattern.label}
+                    </p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{pattern.copy}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selected && (
+              <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   What you should do
                 </span>
                 <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-300">{selected.recommendation}</p>
+              </div>
+            )}
+
+            {selected && (
+              <div className="rounded-lg border-[1.5px] border-[var(--line)] bg-[var(--panel)] p-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                    <ClipboardCheck className="h-3.5 w-3.5 text-[var(--accent)]" />
+                    Safety checklist
+                  </span>
+                  <span className="font-mono text-[10px] font-bold text-zinc-500">
+                    {completedPlanCount}/{actionPlan.length}
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {actionPlan.map((item, index) => {
+                    const key = `${selected._id}:${index}`;
+                    const done = completedSafetyActions[key];
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => toggleSafetyAction(index)}
+                        aria-pressed={done}
+                        className={`flex w-full items-start gap-2.5 rounded-md border p-2.5 text-left ${
+                          done
+                            ? "border-[var(--accent)] bg-[var(--accent-dim)]"
+                            : item.urgent
+                            ? "border-[var(--danger)] bg-[var(--danger-soft)]"
+                            : "border-[var(--line)] bg-[var(--input)] hover:border-[var(--line-strong)]"
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            done ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]" : "border-[var(--line-strong)]"
+                          }`}
+                        >
+                          {done && <Check className="h-3 w-3" />}
+                        </span>
+                        <span>
+                          <span className="block text-[11px] font-semibold text-zinc-300">{item.label}</span>
+                          <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">{item.detail}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={copyVerification}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy a safe verification text
+                </button>
               </div>
             )}
 

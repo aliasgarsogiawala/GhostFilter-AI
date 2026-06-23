@@ -197,7 +197,7 @@ export default function LandingPage() {
     <div className="landing-page min-h-screen bg-[var(--ink)] text-zinc-300">
       <SplashScreen />
 
-      <header className="border-b border-[var(--line)] bg-[var(--ink)]">
+      <header className="border-b border-[var(--line)] bg-[var(--ink)] fixed top-0 w-full left-0">
         <div className="mx-auto flex h-[68px] max-w-6xl items-center justify-between px-5 lg:px-8">
           <Link href="/" className="flex items-center gap-2.5" aria-label="GhostFilter home">
             <BrandMark />
@@ -372,8 +372,9 @@ export default function LandingPage() {
             GhostFilter AI · Beta
           </span>
           <span className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> Gmail</span>
-            <span className="flex items-center gap-1.5"><Code2 className="h-3 w-3" /> GitHub</span>
+            {/* <span className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> Gmail</span>
+            <span className="flex items-center gap-1.5"><Code2 className="h-3 w-3" /> GitHub</span> */}
+            <a href="https://github.com/aliasgarsogiawala">By Aliasgar Sogiawala</a>
           </span>
         </div>
       </footer>
