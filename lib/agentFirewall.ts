@@ -97,6 +97,15 @@ function uniqueEvidence(matches: string[]) {
   return [...new Set(matches.map((match) => match.trim()).filter(Boolean))].slice(0, 8);
 }
 
+function isBenignToolGuard(label: string, context: string) {
+  return (
+    label === "Tool abuse attempt" &&
+    /\b(?:do not|don't|never|without approval,? do not)\b.{0,30}\b(?:send|run|execute|call|upload|delete|modify|post|email|deploy|commit)\b/i.test(
+      context
+    )
+  );
+}
+
 export function sanitizeForAgent(text: string, findings: AgentFirewallFinding[]) {
   const evidence = uniqueEvidence(findings.map((finding) => finding.evidence));
   const warnings = evidence.length
@@ -126,6 +135,9 @@ export function analyzeAgentFirewall(text: string): AgentFirewallResult {
     for (const pattern of rule.patterns) {
       const match = text.match(pattern);
       if (match?.[0]) {
+        const start = match.index ?? 0;
+        const context = text.slice(Math.max(0, start - 40), start + match[0].length + 40);
+        if (isBenignToolGuard(rule.label, context)) continue;
         findings.push({
           label: rule.label,
           detail: rule.detail,

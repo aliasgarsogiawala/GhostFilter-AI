@@ -196,7 +196,10 @@ Safe result for human OR safe context for GhostGPT
 - GhostGPT Firewall mode.
 - GhostGPT firewall history and pass/isolate/block review.
 - GhostGPT firewall API endpoint.
+- Judge demo page: `/demo`.
+- Batch evaluation page: `/eval`.
 - Message, email, link, and file scan modes.
+- Channel-specific scam templates for SMS, WhatsApp, Instagram DM, Telegram, and Discord.
 - 3D risk card and tactile UI surfaces.
 - Collapsible scan history sidebar.
 - Search, filter, and sort scan history.

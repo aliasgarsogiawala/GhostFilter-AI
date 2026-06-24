@@ -19,9 +19,9 @@ export interface ScamEnsembleResult {
 }
 
 const MONEY_OR_CODE_RE =
-  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|crypto|bitcoin|btc|usdt|gift cards?|otp|one[-\s]?time code|verification code|pin)\b)/i;
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
 
-const PAYMENT_VERB_RE = /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward)\b/i;
+const PAYMENT_VERB_RE = /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward|connect|enter|submit)\b/i;
 
 const TRUST_CLAIM_RE =
   /\b(?:i\s*(?:am|'?m)|im|this\s+is|it\s+is)\s+(?:really\s+|actually\s+)?(?:the\s+)?(?:real|official|verified)\s+[a-z][a-z'-]*(?:\s+[a-z][a-z'-]*){0,4}/i;
@@ -30,7 +30,15 @@ const PRESSURE_RE =
   /\b(?:urgent|immediately|right now|asap|last chance|limited time|before it expires|account locked|suspended|final warning|don't tell anyone|keep this private)\b/i;
 
 const PRIZE_CRYPTO_JOB_RE =
-  /\b(?:congratulations|winner|won|prize|airdrop|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
+  /\b(?:congratulations|winner|won|prize|airdrop|free\s+(?:nitro|iphone|gift|reward)|nitro\s+(?:drop|gift)|gift\s*card|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
+
+const SUPPORT_IMPERSONATION_RE =
+  /\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank|support|admin|security)\b.{0,35}\b(?:support|security|team|admin|official|verification|helpdesk|copyright|appeal)\b|\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank)\s+(?:support|copyright|appeal)\b/i;
+
+const ACCOUNT_SECURITY_RE =
+  /\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b.{0,45}\b(?:blocked|locked|suspended|verify|verification|kyc|reactivate|restore|deleted|disabled|appeal)\b|\b(?:blocked|locked|suspended|deleted|disabled)\b.{0,45}\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b/i;
+
+const URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
 
 function clampScore(score: number) {
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -63,6 +71,10 @@ export function analyzeScamEnsemble(
   const trustClaim = opts.socialEngineering.identityClaim || TRUST_CLAIM_RE.test(text);
   const pressure = PRESSURE_RE.test(text);
   const prizeCryptoJob = PRIZE_CRYPTO_JOB_RE.test(text);
+  const supportImpersonation = SUPPORT_IMPERSONATION_RE.test(text);
+  const accountSecurity = ACCOUNT_SECURITY_RE.test(text);
+  const hasUrl = URL_RE.test(text);
+  const secretCredentialRequest = /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed)\b/i.test(text);
   const forensicHit = !!opts.forensics?.indicators.some((indicator) => indicator.severity === "red");
 
   addLayer(layers, {
@@ -124,6 +136,38 @@ export function analyzeScamEnsemble(
     });
   }
 
+  if (supportImpersonation) {
+    const phrase = text.match(SUPPORT_IMPERSONATION_RE)?.[0] ?? "platform/support identity claim";
+    addLayer(layers, {
+      label: "Platform/support impersonation",
+      score: paymentLike || pressure ? 92 : 70,
+      evidence: phrase,
+      explanation: "The sender claims to be a platform, bank, support, admin, or security team.",
+    });
+    flaggedPhrases.push({
+      phrase,
+      reason: "Fake support/admin messages commonly ask for OTPs, passwords, or urgent verification.",
+      severity: paymentLike || pressure ? "red" : "amber",
+    });
+  }
+
+  if (accountSecurity) {
+    const phrase = text.match(ACCOUNT_SECURITY_RE)?.[0] ?? "account security warning";
+    addLayer(layers, {
+      label: "Account/KYC takeover lure",
+      score: hasUrl ? 94 : 74,
+      evidence: phrase,
+      explanation: "The message threatens account loss or KYC/account blocking to push the user toward a verification action.",
+    });
+    flaggedPhrases.push({
+      phrase,
+      reason: hasUrl
+        ? "Account-block/KYC warnings with links are a classic credential-phishing pattern."
+        : "Account-block/KYC pressure is a common phishing setup.",
+      severity: hasUrl ? "red" : "amber",
+    });
+  }
+
   if (opts.injection.detected) {
     addLayer(layers, {
       label: "AI manipulation language",
@@ -143,7 +187,15 @@ export function analyzeScamEnsemble(
   }
 
   const score = weightedScore(layers);
-  const hardScam = opts.socialEngineering.combinedImpersonationPayment || (paymentLike && trustClaim) || forensicHit;
+  const hardScam =
+    opts.socialEngineering.combinedImpersonationPayment ||
+    (paymentLike && trustClaim) ||
+    (paymentLike && supportImpersonation) ||
+    (paymentLike && prizeCryptoJob) ||
+    (paymentLike && secretCredentialRequest) ||
+    (prizeCryptoJob && hasUrl) ||
+    (accountSecurity && hasUrl) ||
+    forensicHit;
   const needsReview = hardScam || score >= 38 || paymentLike || trustClaim;
 
   return {
@@ -155,8 +207,9 @@ export function analyzeScamEnsemble(
     signals: [
       { label: "ML Ensemble Risk", value: score },
       { label: "Payment / Code Intent", value: paymentLike ? 88 : 0 },
-      { label: "Trust Impersonation", value: trustClaim ? (paymentLike ? 96 : 62) : 0 },
+      { label: "Trust Impersonation", value: trustClaim || supportImpersonation ? (paymentLike ? 96 : 72) : 0 },
       { label: "Behavioral Pressure", value: pressure ? 68 : 0 },
+      { label: "Account / KYC Threat", value: accountSecurity ? (hasUrl ? 94 : 72) : 0 },
     ],
   };
 }

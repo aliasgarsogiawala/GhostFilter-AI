@@ -31,6 +31,11 @@ const KNOWN_BRAND_DOMAINS = [
   "docusign.com",
   "outlook.com",
   "icloud.com",
+  "sbi.co.in",
+  "onlinesbi.sbi",
+  "hdfcbank.com",
+  "icicibank.com",
+  "axisbank.com",
 ];
 
 const URL_SHORTENERS = new Set([

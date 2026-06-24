@@ -415,6 +415,51 @@ const MANUAL_CHANNELS = [
   { id: "telegram", label: "Telegram", icon: Send },
 ] as const;
 
+const CHANNEL_TEMPLATES: Record<string, { label: string; text: string }[]> = {
+  "SMS / Text": [
+    {
+      label: "Bank KYC block",
+      text: "Your SBI account is blocked. Verify KYC now: http://sbi-secure-verify-login.com",
+    },
+    {
+      label: "Delivery fee",
+      text: "India Post: parcel held for unpaid ₹49 fee. Pay now to release: http://post-track-release.net",
+    },
+  ],
+  WhatsApp: [
+    {
+      label: "Prize fee",
+      text: "Congrats! You won an iPhone. Pay ₹99 delivery fee now to claim.",
+    },
+    {
+      label: "Friend money",
+      text: "Hey can you send me ₹500? I forgot my wallet, I’ll pay you back tonight.",
+    },
+  ],
+  "Instagram DM": [
+    {
+      label: "Fake support OTP",
+      text: "Instagram support here. Your account will be deleted in 10 minutes. Send your OTP to confirm ownership.",
+    },
+    {
+      label: "Celebrity impersonation",
+      text: "send 150 rupees, im real shah rukh khan",
+    },
+  ],
+  Telegram: [
+    {
+      label: "Crypto doubling",
+      text: "Guaranteed crypto returns. Send 1000 INR today and double it in 24 hours.",
+    },
+  ],
+  Discord: [
+    {
+      label: "Nitro link",
+      text: "Free Nitro drop! Login now at http://discord-gift-claim.net before it expires.",
+    },
+  ],
+};
+
 const CONNECTION_LANES = [
   {
     id: "google",
@@ -2060,6 +2105,28 @@ export default function GhostFilterDashboard() {
             {analysisError && (
               <div className="rounded-md border border-[#ef4060]/60 bg-[#1a0c10] px-3 py-2 text-[11px] text-[#ef4060]" role="alert">
                 {analysisError}
+              </div>
+            )}
+            {sourceHint && CHANNEL_TEMPLATES[sourceHint]?.length > 0 && (
+              <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-600">
+                  {sourceHint} scam templates
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {CHANNEL_TEMPLATES[sourceHint].map((template) => (
+                    <button
+                      key={template.label}
+                      onClick={() => {
+                        setMessageText(template.text);
+                        setInputMode(detectInputMode(template.text));
+                        setAgentResult(null);
+                      }}
+                      className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[10px] font-semibold text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
+                    >
+                      {template.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-1.5">

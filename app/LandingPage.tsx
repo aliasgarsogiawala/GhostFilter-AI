@@ -255,6 +255,12 @@ export default function LandingPage() {
             <a href="#product" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 sm:block">
               Product
             </a>
+            <Link href="/demo" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
+              Demo
+            </Link>
+            <Link href="/eval" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
+              Eval
+            </Link>
             <a href="#privacy" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
               Privacy
             </a>
