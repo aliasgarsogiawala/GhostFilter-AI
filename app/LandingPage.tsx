@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -27,18 +28,18 @@ import { useAppearance, useTheme } from "@/lib/useTheme";
 const BENEFITS = [
   {
     icon: MessageSquareText,
-    title: "Understand the message",
-    copy: "See suspicious phrases highlighted with a plain explanation of why they matter.",
+    title: "Scam detection for people",
+    copy: "Paste suspicious messages, emails, links, screenshots, or PDFs and get a clear verdict with evidence.",
+  },
+  {
+    icon: Bot,
+    title: "Prompt-injection firewall for GhostGPT",
+    copy: "Detect instruction overrides, jailbreaks, secret-extraction attempts, and unsafe tool-use requests before content reaches an AI agent.",
   },
   {
     icon: Link2,
-    title: "Check what is behind the link",
-    copy: "Domains are compared with threat intelligence without opening them in your browser.",
-  },
-  {
-    icon: FileCheck2,
-    title: "Inspect the evidence",
-    copy: "Email headers, attachments, sender identity, and authentication checks stay visible.",
+    title: "Safe context handoff",
+    copy: "Generate a sanitized wrapper so GhostGPT treats external content as untrusted data, not instructions.",
   },
 ] as const;
 
@@ -46,7 +47,12 @@ const FAQS = [
   {
     question: "What can I check with GhostFilter?",
     answer:
-      "You can paste a text message, email, direct message, or link. You can also upload screenshots, PDFs, text files, and saved .eml emails.",
+      "You can paste a text message, email, direct message, link, or AI-agent context. You can also upload screenshots, PDFs, text files, and saved .eml emails.",
+  },
+  {
+    question: "How does GhostFilter protect GhostGPT?",
+    answer:
+      "GhostFilter scans untrusted content before it reaches GhostGPT. If it finds prompt injection, secret extraction, jailbreak, or tool-abuse attempts, it recommends blocking or isolating the content and can generate a safe context wrapper.",
   },
   {
     question: "Does GhostFilter open suspicious links?",
@@ -211,7 +217,7 @@ export default function LandingPage() {
     <div className="landing-page min-h-screen bg-[var(--ink)] text-zinc-300">
       <SplashScreen />
 
-      <header className="border-b border-[var(--line)] bg-[var(--ink)]">
+      <header className="fixed left-0 top-0 z-50 w-full border-b border-[var(--line)] bg-[var(--ink)]">
         <div className="mx-auto flex h-[68px] max-w-6xl items-center justify-between px-5 lg:px-8">
           <Link href="/" className="flex items-center gap-2.5" aria-label="GhostFilter home">
             <BrandMark />
@@ -242,19 +248,19 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main>
+      <main className="pt-[68px]">
         <section className="border-b border-[var(--line)]">
           <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 lg:grid-cols-[.92fr_1.08fr] lg:items-center lg:px-8 lg:py-20">
             <div>
               <p className="flex items-center gap-2 text-[11px] font-medium text-[var(--accent)]">
                 <ScanLine className="h-4 w-4" />
-                Scam and phishing analysis
+                Scam detection + AI agent firewall
               </p>
               <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-[1.08] tracking-[-0.045em] text-zinc-100 sm:text-5xl lg:text-[58px]">
-                Check the message before you trust it.
+                Check the message before you trust it — or before GhostGPT reads it.
               </h1>
               <p className="mt-6 max-w-lg text-[15px] leading-7 text-zinc-400">
-                Paste a suspicious email, text, or DM. GhostFilter shows the risk, the evidence behind it, and the safest next step.
+                GhostFilter protects people from scams and protects AI agents from prompt injection, jailbreaks, secret extraction, and unsafe tool-use instructions.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -262,7 +268,7 @@ export default function LandingPage() {
                   href="/dashboard"
                   className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-5 text-[12px] font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-bright)]"
                 >
-                  Check a message
+                  Open protection console
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
@@ -275,7 +281,7 @@ export default function LandingPage() {
               </div>
 
               <div className="mt-8 grid max-w-lg gap-2 sm:grid-cols-3">
-                {["No sign-up", "Read-only access", "Clear explanations"].map((item) => (
+                {["Scam shield", "GhostGPT firewall", "Safe context handoff"].map((item) => (
                   <span key={item} className="landing-mini-card flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[10px] text-zinc-500">
                     <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
                     {item}
@@ -292,12 +298,12 @@ export default function LandingPage() {
           <div className="mx-auto max-w-6xl px-5 py-14 lg:px-8 lg:py-18">
             <div className="grid gap-8 lg:grid-cols-[.75fr_1.25fr]">
               <div>
-                <p className="text-[11px] font-medium text-[var(--accent)]">What it checks</p>
+                <p className="text-[11px] font-medium text-[var(--accent)]">Two protection layers</p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-zinc-100">
-                  The evidence you would check manually, in one place.
+                  One scanner for humans. One firewall for AI agents.
                 </h2>
                 <p className="mt-4 max-w-md text-[13px] leading-6 text-zinc-500">
-                  The result stays useful even when the answer is uncertain. You can see which signals were found and decide with context.
+                  Scam detection catches social-engineering risk. GhostGPT protection catches prompt injection before untrusted content enters an AI agent context.
                 </p>
               </div>
 
