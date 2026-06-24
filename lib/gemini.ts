@@ -1,7 +1,13 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import type { LinkFinding } from "./heuristics";
 import type { InjectionFinding } from "./promptInjection";
 import type { SocialEngineeringFinding } from "./socialEngineering";
+import {
+  geminiKeyHelpText,
+  getGeminiClientForKey,
+  getGeminiKeys,
+  isGeminiTransientOrQuotaError,
+} from "./geminiKeys";
 
 const SYSTEM_INSTRUCTION = `You are GhostFilter, a consumer-protection scam/phishing analyst.
 
@@ -74,16 +80,6 @@ const RESPONSE_SCHEMA = {
   },
   required: ["verdict", "confidence", "summary", "flaggedPhrases", "signals", "recommendation"],
 };
-
-let client: GoogleGenAI | null = null;
-function getClient(): GoogleGenAI {
-  if (!client) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-    client = new GoogleGenAI({ apiKey });
-  }
-  return client;
-}
 
 export async function reviewWithGemini(
   text: string,
@@ -165,31 +161,30 @@ Identify specific phrases in the message that are red flags (quote them exactly 
 /** Gemini's free tier returns transient 503 "model overloaded" / 429 spikes. Retry those a
  *  couple of times with backoff so we fall back to a heuristic-only verdict far less often. */
 async function generateWithRetry(prompt: string, attempts = 3) {
-  const client = getClient();
+  const keys = getGeminiKeys();
+  if (!keys.length) throw new Error(geminiKeyHelpText());
+
+  let lastErr: unknown = null;
   for (let i = 0; i < attempts; i++) {
-    try {
-      return await client.models.generateContent({
-        // flash-lite has a much higher free-tier daily request quota than 2.5-flash
-        // (which is only 20/day) and is plenty capable for this classification task.
-        model: "gemini-2.5-flash-lite",
-        contents: prompt,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      });
-    } catch (err) {
-      const msg = String(err);
-      const transient =
-        msg.includes("503") ||
-        msg.includes("UNAVAILABLE") ||
-        msg.includes("overloaded") ||
-        msg.includes("429") ||
-        msg.includes("RESOURCE_EXHAUSTED");
-      if (!transient || i === attempts - 1) throw err;
-      await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+    for (const key of keys) {
+      try {
+        return await getGeminiClientForKey(key).models.generateContent({
+          // flash-lite has a much higher free-tier daily request quota than 2.5-flash
+          // (which is only 20/day) and is plenty capable for this classification task.
+          model: "gemini-2.5-flash-lite",
+          contents: prompt,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: "application/json",
+            responseSchema: RESPONSE_SCHEMA,
+          },
+        });
+      } catch (err) {
+        lastErr = err;
+        if (!isGeminiTransientOrQuotaError(err)) throw err;
+      }
     }
+    await new Promise((r) => setTimeout(r, 800 * (i + 1)));
   }
-  throw new Error("Gemini unreachable after retries");
+  throw lastErr instanceof Error ? lastErr : new Error("Gemini unreachable after retries");
 }

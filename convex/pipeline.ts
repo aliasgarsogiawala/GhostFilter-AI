@@ -11,6 +11,7 @@ import {
   detectSocialEngineering,
   type SocialEngineeringFinding,
 } from "../lib/socialEngineering";
+import { analyzeScamEnsemble, type ScamModelLayer } from "../lib/scamEnsemble";
 import { checkDomainReputation } from "../lib/virustotal";
 import { scanAndCapture, type UrlscanResult } from "../lib/urlscan";
 import {
@@ -83,6 +84,8 @@ export interface PipelineResult {
   linkIntel: LinkIntel[];
   screenshot: UrlscanResult | null;
   forensics: EmailForensics | null;
+  ensembleScore: number;
+  mlBreakdown: ScamModelLayer[];
 }
 
 /** Checks domain reputation for up to the first 2 links — cheap, synchronous, no polling. */
@@ -99,6 +102,22 @@ async function gatherLinkIntel(links: LinkFinding[]): Promise<LinkIntel[]> {
     })
   );
   return results.filter((r): r is LinkIntel => r !== null);
+}
+
+function mergeFlaggedPhrases(
+  ...groups: { phrase: string; reason: string; severity: "amber" | "red" }[][]
+) {
+  const merged: { phrase: string; reason: string; severity: "amber" | "red" }[] = [];
+  for (const item of groups.flat()) {
+    const key = item.phrase.trim().toLowerCase();
+    const existingIndex = merged.findIndex((candidate) => candidate.phrase.trim().toLowerCase() === key);
+    if (existingIndex === -1) {
+      merged.push(item);
+    } else if (merged[existingIndex].severity === "amber" && item.severity === "red") {
+      merged[existingIndex] = item;
+    }
+  }
+  return merged;
 }
 
 /**
@@ -127,6 +146,11 @@ export async function runPipeline(
     : looksLikeRawEmail(text)
     ? parseEmailForensics(text)
     : null;
+  const ensemble = analyzeScamEnsemble(text, mlScore, {
+    socialEngineering,
+    injection,
+    forensics,
+  });
   const forensicHardHit = !!forensics?.indicators.some((i) => i.severity === "red");
 
   // Threat-intel runs whenever the message has links — it's independent of the ML score, so
@@ -144,10 +168,11 @@ export async function runPipeline(
     links.some((l) => l.lookalike || l.expanded?.blocked) ||
     injection.detected ||
     socialEngineering.combinedImpersonationPayment ||
+    ensemble.hardScam ||
     linkFlagged ||
     forensicHardHit;
   const shouldEscalate =
-    mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit || socialEngineering.paymentRequest;
+    mlScore >= ML_REVIEW_THRESHOLD || hasHardHeuristicHit || socialEngineering.paymentRequest || ensemble.needsReview;
 
   if (!shouldEscalate) {
     const screenshot = await screenshotPromise;
@@ -160,11 +185,16 @@ export async function runPipeline(
       recommendation:
         "This looks fine, but stay cautious with any unexpected request for money, codes, or personal info.",
       flaggedPhrases: [],
-      signals: baselineSignals(mlScore, links, lowerText, injection, socialEngineering),
+      signals: [
+        ...baselineSignals(mlScore, links, lowerText, injection, socialEngineering),
+        ...ensemble.signals,
+      ],
       aiReviewed: false,
       linkIntel,
       screenshot,
       forensics,
+      ensembleScore: ensemble.score,
+      mlBreakdown: ensemble.layers,
     };
   }
 
@@ -189,6 +219,7 @@ export async function runPipeline(
     const fallbackVerdict: "suspicious" | "scam" =
       injection.detected ||
       socialEngineering.combinedImpersonationPayment ||
+      ensemble.hardScam ||
       linkFlagged ||
       forensicHardHit
         ? "scam"
@@ -196,9 +227,9 @@ export async function runPipeline(
     return {
       verdict: fallbackVerdict,
       confidence: socialEngineering.combinedImpersonationPayment
-        ? 90
+        ? Math.max(90, ensemble.score)
         : fallbackVerdict === "scam"
-          ? Math.max(85, Math.round(mlScore * 100))
+          ? Math.max(85, ensemble.score, Math.round(mlScore * 100))
           : 50,
       mlScore,
       summary:
@@ -206,20 +237,28 @@ export async function runPipeline(
           ? "Concrete fraud indicators were found, but full AI review was temporarily unavailable — treat this as a scam."
           : "Our AI reviewer was temporarily unavailable, so this is a cautious triage-only result, not a confirmed scam. Re-run the analysis in a moment for a full verdict.",
       recommendation: "Don't act on any request for money, passwords, or codes until you've verified it through an official channel you trust.",
-      flaggedPhrases: socialEngineering.combinedImpersonationPayment
-        ? [
+      flaggedPhrases: mergeFlaggedPhrases(
+        socialEngineering.combinedImpersonationPayment
+          ? [
             {
               phrase: socialEngineering.identityPhrase ?? "claim to be the real person",
               reason: "The sender claims a trusted identity while asking for money.",
               severity: "red",
             },
           ]
-        : [],
-      signals: baselineSignals(mlScore, links, lowerText, injection, socialEngineering),
+          : [],
+        ensemble.flaggedPhrases
+      ),
+      signals: [
+        ...baselineSignals(mlScore, links, lowerText, injection, socialEngineering),
+        ...ensemble.signals,
+      ],
       aiReviewed: false,
       linkIntel,
       screenshot,
       forensics,
+      ensembleScore: ensemble.score,
+      mlBreakdown: ensemble.layers,
     };
   }
 
@@ -233,6 +272,17 @@ export async function runPipeline(
   let summary = ai.summary;
   let recommendation = ai.recommendation;
   let flaggedPhrases = ai.flaggedPhrases;
+  signals = [...signals, ...ensemble.signals].reduce<{ label: string; value: number }[]>((acc, signal) => {
+    const existing = acc.find((item) => item.label === signal.label);
+    if (existing) existing.value = Math.max(existing.value, signal.value);
+    else acc.push(signal);
+    return acc;
+  }, []);
+  for (const finding of ensemble.flaggedPhrases) {
+    if (!flaggedPhrases.some((item) => item.phrase === finding.phrase)) {
+      flaggedPhrases = [...flaggedPhrases, finding];
+    }
+  }
   if (hasHardHeuristicHit) {
     // Don't let the model silently downplay a confirmed heuristic hit.
     signals = signals.map((s) => {
@@ -243,9 +293,9 @@ export async function runPipeline(
       if (s.label === SIGNAL_LABELS[5] && injection.detected) return { ...s, value: Math.max(s.value, 95) };
       return s;
     });
-    if (socialEngineering.combinedImpersonationPayment) {
+    if (socialEngineering.combinedImpersonationPayment || ensemble.hardScam) {
       verdict = "scam";
-      confidence = Math.max(confidence, 90);
+      confidence = Math.max(confidence, ensemble.score, 90);
       summary =
         "This message asks for money while claiming to be the real identity of another person, a strong impersonation-scam pattern.";
       recommendation =
@@ -279,6 +329,8 @@ export async function runPipeline(
     linkIntel,
     screenshot,
     forensics,
+    ensembleScore: ensemble.score,
+    mlBreakdown: ensemble.layers,
   };
 }
 
@@ -301,6 +353,8 @@ export const analyzeMessage = action({
       linkIntel: result.linkIntel,
       screenshot: result.screenshot ?? undefined,
       forensics: result.forensics ?? undefined,
+      ensembleScore: result.ensembleScore,
+      mlBreakdown: result.mlBreakdown,
     });
     return { ...result, id };
   },
@@ -333,6 +387,8 @@ export const analyzeUpload = action({
       linkIntel: result.linkIntel,
       screenshot: result.screenshot ?? undefined,
       forensics: result.forensics ?? undefined,
+      ensembleScore: result.ensembleScore,
+      mlBreakdown: result.mlBreakdown,
     });
     return { ...result, id, extractedText };
   },

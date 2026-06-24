@@ -73,6 +73,17 @@ export const insert = internalMutation({
         ),
       })
     ),
+    ensembleScore: v.optional(v.number()),
+    mlBreakdown: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          score: v.number(),
+          evidence: v.string(),
+          explanation: v.string(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("scanResults", args);
@@ -115,6 +126,11 @@ export const analyticsForOwner = query({
       for (const s of r.signals) {
         const t = (signalTotals[s.label] ??= { sum: 0, n: 0 });
         t.sum += s.value;
+        t.n += 1;
+      }
+      if (r.ensembleScore !== undefined) {
+        const t = (signalTotals["ML Ensemble Risk"] ??= { sum: 0, n: 0 });
+        t.sum += r.ensembleScore;
         t.n += 1;
       }
       for (const li of r.linkIntel ?? []) {

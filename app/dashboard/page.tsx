@@ -60,6 +60,7 @@ import {
   PhoneCall,
   Bot,
   ShieldX,
+  BrainCircuit,
 } from "lucide-react";
 import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -97,6 +98,16 @@ interface ScanResultDoc {
     fields: { label: string; value: string; status?: "ok" | "warn" | "bad" }[];
     indicators: { label: string; detail: string; severity: "amber" | "red" }[];
   };
+  ensembleScore?: number;
+  mlBreakdown?: { label: string; score: number; evidence: string; explanation: string }[];
+}
+
+interface AgentScanDoc extends AgentFirewallResult {
+  _id: string;
+  _creationTime: number;
+  source: "manual" | "file" | "api";
+  subject?: string;
+  snippet: string;
 }
 
 function verdictTone(verdict: Verdict): Tone {
@@ -932,9 +943,14 @@ export default function GhostFilterDashboard() {
   const scans = useQuery(api.scanResults.listForOwner, ownerId ? { ownerId } : "skip") as
     | ScanResultDoc[]
     | undefined;
+  const agentScans = useQuery(api.agentScans.listForOwner, ownerId ? { ownerId } : "skip") as
+    | AgentScanDoc[]
+    | undefined;
 
   const analyzeMessage = useAction(api.pipeline.analyzeMessage);
   const analyzeUpload = useAction(api.pipeline.analyzeUpload);
+  const saveAgentScan = useMutation(api.agentScans.insertManual);
+  const clearAgentScans = useMutation(api.agentScans.clearForOwner);
   const scanInbox = useAction(api.gmail.scanInbox);
   const scanDrive = useAction(api.drive.scanDrive);
   const scanGithub = useAction(api.github.scanNotifications);
@@ -954,11 +970,13 @@ export default function GhostFilterDashboard() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [sourceHint, setSourceHint] = useState<string | null>(null);
   const historyOpen = useSyncExternalStore(subscribeHistoryOpen, getHistoryOpenSnapshot, () => true);
   const [historySearch, setHistorySearch] = useState("");
   const [historyFilter, setHistoryFilter] = useState<ScanFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [agentHistoryOpen, setAgentHistoryOpen] = useState(true);
   const [scanSort, setScanSort] = useState<ScanSort>("newest");
   const [deepReviewOnly, setDeepReviewOnly] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
@@ -976,11 +994,24 @@ export default function GhostFilterDashboard() {
         ? scans?.find((s) => s._id === selectedId)
         : scans?.[0]
       : undefined;
+  const selectedAgent =
+    protectionMode === "agent"
+      ? selectedAgentId
+        ? agentScans?.find((scan) => scan._id === selectedAgentId)
+        : agentScans?.[0]
+      : undefined;
+  const activeAgentResult = agentResult ?? selectedAgent ?? null;
   const scanCounts = {
     all: scans?.length ?? 0,
     safe: scans?.filter((scan) => scan.verdict === "safe").length ?? 0,
     suspicious: scans?.filter((scan) => scan.verdict === "suspicious").length ?? 0,
     scam: scans?.filter((scan) => scan.verdict === "scam").length ?? 0,
+  };
+  const agentCounts = {
+    all: agentScans?.length ?? 0,
+    block: agentScans?.filter((scan) => scan.verdict === "block").length ?? 0,
+    isolate: agentScans?.filter((scan) => scan.verdict === "isolate").length ?? 0,
+    pass: agentScans?.filter((scan) => scan.verdict === "pass").length ?? 0,
   };
   const sourceCounts = {
     all: scans?.length ?? 0,
@@ -1014,6 +1045,7 @@ export default function GhostFilterDashboard() {
 
   const selectResult = (id: string | null) => {
     setSelectedId(id);
+    setSelectedAgentId(null);
     if (id) {
       setProtectionMode("scam");
       setAgentResult(null);
@@ -1021,6 +1053,41 @@ export default function GhostFilterDashboard() {
     setFeedbackOpen(false);
     setFeedbackSent(false);
     setActionStatus(null);
+  };
+
+  const selectAgentResult = (scan: AgentScanDoc) => {
+    setProtectionMode("agent");
+    setSelectedId(null);
+    setSelectedAgentId(scan._id);
+    setAgentResult(scan);
+    setMessageText(scan.snippet);
+    setInputMode("message");
+    setFeedbackOpen(false);
+    setFeedbackSent(false);
+    setActionStatus(null);
+  };
+
+  const saveFirewallResult = async (
+    result: AgentFirewallResult,
+    snippet: string,
+    source: "manual" | "file" | "api" = "manual",
+    subject?: string
+  ) => {
+    if (!ownerId) return;
+    const id = await saveAgentScan({
+      ownerId,
+      source,
+      subject,
+      snippet: snippet.slice(0, 6000),
+      verdict: result.verdict,
+      score: result.score,
+      title: result.title,
+      summary: result.summary,
+      recommendation: result.recommendation,
+      findings: result.findings,
+      sanitizedContext: result.sanitizedContext,
+    });
+    setSelectedAgentId(id);
   };
 
   const analyzeText = async (text: string) => {
@@ -1031,6 +1098,7 @@ export default function GhostFilterDashboard() {
       if (protectionMode === "agent") {
         const result = analyzeAgentFirewall(text);
         setAgentResult(result);
+        await saveFirewallResult(result, text, "manual");
         setActionStatus("GhostGPT firewall scan complete");
         return;
       }
@@ -1064,8 +1132,10 @@ export default function GhostFilterDashboard() {
         if (!text.trim()) throw new Error("That file doesn't contain readable text.");
         setMessageText(text.slice(0, 20_000));
         if (protectionMode === "agent") {
-          const result = analyzeAgentFirewall(`Uploaded file: ${uploadedFile.name}\n\n${text.slice(0, 20_000)}`);
+          const content = `Uploaded file: ${uploadedFile.name}\n\n${text.slice(0, 20_000)}`;
+          const result = analyzeAgentFirewall(content);
           setAgentResult(result);
+          await saveFirewallResult(result, content, "file", uploadedFile.name.slice(0, 200));
           setActionStatus("GhostGPT firewall scan complete");
           return;
         }
@@ -1128,6 +1198,7 @@ export default function GhostFilterDashboard() {
     setFeedbackOpen(false);
     setFeedbackSent(false);
     setAgentResult(null);
+    setSelectedAgentId(null);
     textareaRef.current?.focus();
     textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -1185,6 +1256,16 @@ export default function GhostFilterDashboard() {
     await clearScans({ ownerId });
     selectResult(null);
     setActionStatus("History cleared");
+  };
+
+  const handleClearAgentHistory = async () => {
+    if (!ownerId || !agentScans?.length) return;
+    const ok = window.confirm(`Delete all ${agentScans.length} GhostGPT firewall scans?`);
+    if (!ok) return;
+    await clearAgentScans({ ownerId });
+    setSelectedAgentId(null);
+    setAgentResult(null);
+    setActionStatus("GhostGPT firewall history cleared");
   };
 
   const copyTextToClipboard = async (text: string) => {
@@ -1259,8 +1340,8 @@ export default function GhostFilterDashboard() {
   };
 
   const copySafeContext = async () => {
-    if (!agentResult) return;
-    const copied = await copyTextToClipboard(agentResult.sanitizedContext);
+    if (!activeAgentResult) return;
+    const copied = await copyTextToClipboard(activeAgentResult.sanitizedContext);
     setActionStatus(copied ? "Safe GhostGPT context copied" : "Copy failed — select and copy manually");
   };
 
@@ -1276,9 +1357,9 @@ export default function GhostFilterDashboard() {
   };
 
   const tone = selected ? verdictTone(selected.verdict) : "clear";
-  const agentTone = agentVerdictTone(agentResult);
+  const agentTone = agentVerdictTone(activeAgentResult);
   const activeTone = protectionMode === "agent" ? agentTone : tone;
-  const gaugeValue = protectionMode === "agent" ? agentResult?.score ?? 0 : selected ? scamLikelihood(selected) : 0;
+  const gaugeValue = protectionMode === "agent" ? activeAgentResult?.score ?? 0 : selected ? scamLikelihood(selected) : 0;
   const segments = selected ? buildHighlightSegments(selected.snippet, selected.flaggedPhrases) : [];
   const plainResult = selected ? plainEnglishResult(selected) : null;
   const pattern = selected ? riskPattern(selected) : null;
@@ -1493,6 +1574,72 @@ export default function GhostFilterDashboard() {
                     ))}
                   </div>
                 </details>
+                <div className="mx-2 mt-2 rounded-lg border border-[var(--line)] bg-[var(--panel)]">
+                  <button
+                    onClick={() => setAgentHistoryOpen((open) => !open)}
+                    aria-expanded={agentHistoryOpen}
+                    className="flex w-full cursor-pointer items-center justify-between px-3 py-2.5 text-left"
+                  >
+                    <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                      <Bot className="h-3.5 w-3.5 text-[var(--violet)]" />
+                      GhostGPT firewall
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-[9px] font-bold text-zinc-600">{agentCounts.all}</span>
+                      <ChevronDown className={`h-3.5 w-3.5 text-zinc-600 transition-transform ${agentHistoryOpen ? "rotate-180" : ""}`} />
+                    </span>
+                  </button>
+                  {agentHistoryOpen && <div className="border-t border-[var(--line)] p-2.5">
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        ["Blocked", agentCounts.block, "text-[var(--danger)]"],
+                        ["Isolated", agentCounts.isolate, "text-[var(--warn)]"],
+                        ["Passed", agentCounts.pass, "text-[var(--accent-bright)]"],
+                      ].map(([label, value, color]) => (
+                        <div key={label} className="rounded-md border border-[var(--line)] bg-[var(--input)] p-2">
+                          <p className={`font-mono text-base font-black ${color}`}>{value}</p>
+                          <p className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 space-y-1.5">
+                      {agentScans?.slice(0, 5).map((scan) => {
+                        const t = agentVerdictTone(scan);
+                        const isSelected = selectedAgent?._id === scan._id;
+                        return (
+                          <button
+                            key={scan._id}
+                            onClick={() => selectAgentResult(scan)}
+                            className={`flex w-full items-start gap-2 rounded-md border bg-[var(--input)] p-2 text-left hover:border-[var(--line-strong)] ${
+                              isSelected ? "border-[var(--accent)]" : "border-[var(--line)]"
+                            }`}
+                          >
+                            <ShieldAlert className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${TONE_TEXT[t]}`} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[10px] font-semibold text-zinc-300">{scan.title}</span>
+                              <span className="mt-0.5 block truncate font-mono text-[9px] text-zinc-600">{scan.snippet}</span>
+                            </span>
+                            <span className={`font-mono text-[9px] font-bold ${TONE_TEXT[t]}`}>{scan.score}%</span>
+                          </button>
+                        );
+                      })}
+                      {!agentScans?.length && (
+                        <p className="rounded-md border border-[var(--line)] bg-[var(--input)] p-2.5 text-[10px] leading-relaxed text-zinc-500">
+                          Run GhostGPT Firewall mode once and saved agent-risk decisions will appear here.
+                        </p>
+                      )}
+                    </div>
+                    {!!agentScans?.length && (
+                      <button
+                        onClick={handleClearAgentHistory}
+                        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-600 hover:text-[var(--danger)]"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Clear firewall history
+                      </button>
+                    )}
+                  </div>}
+                </div>
                 <div className="flex-1 overflow-y-auto px-2 py-2">
                   {!scans?.length && (
                     <div className="mx-1 mt-1 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4">
@@ -1746,7 +1893,7 @@ export default function GhostFilterDashboard() {
               honest manual-paste path instead of fake "connect" buttons. */}
           <div className="order-4 border-b border-[var(--line)] px-5 py-3">
             <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
-              Pasting from a chat app? Choose it below to personalize the prompt.
+              Pasting from Instagram, WhatsApp, SMS, Discord, or Telegram? Choose the source, paste the message, and GhostFilter runs the same scam/AI checks.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {MANUAL_CHANNELS.map((c) => {
@@ -1789,6 +1936,7 @@ export default function GhostFilterDashboard() {
                   onClick={() => {
                     setProtectionMode(id);
                     setSelectedId(null);
+                    setSelectedAgentId(null);
                     setAgentResult(null);
                     setActionStatus(null);
                     if (id === "agent" && inputMode === "link") setInputMode("message");
@@ -1964,7 +2112,7 @@ export default function GhostFilterDashboard() {
                 value={gaugeValue}
                 tone={activeTone}
                 scanning={analyzing}
-                hasResult={protectionMode === "agent" ? !!agentResult : !!selected}
+                hasResult={protectionMode === "agent" ? !!activeAgentResult : !!selected}
                 context={protectionMode}
               />
             </TiltCard>
@@ -1976,8 +2124,8 @@ export default function GhostFilterDashboard() {
             </span>
             <div className="relative min-h-[120px] rounded-md border border-[var(--line)] bg-[var(--input)] p-4 font-mono text-[12.5px] leading-[1.8] text-zinc-400">
               {protectionMode === "scam" && selected && <VerdictStamp verdict={selected.verdict} />}
-              {protectionMode === "agent" && agentResult ? (
-                <p className="whitespace-pre-wrap">{messageText || "GhostGPT firewall scan completed."}</p>
+              {protectionMode === "agent" && activeAgentResult ? (
+                <p className="whitespace-pre-wrap">{messageText || selectedAgent?.snippet || "GhostGPT firewall scan completed."}</p>
               ) : selected ? (
                 <p className="whitespace-pre-wrap">
                   {segments.map((seg, i) => (
@@ -2094,13 +2242,13 @@ export default function GhostFilterDashboard() {
               </div>
               <div className={`mt-2 flex items-center gap-2 text-2xl font-semibold tracking-tight ${TONE_TEXT[activeTone]}`}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TONE_HEX[activeTone] }} />
-                {protectionMode === "agent" ? friendlyAgentVerdict(agentResult) : selected ? friendlyVerdict(selected.verdict) : "Waiting for a message"}
+                {protectionMode === "agent" ? friendlyAgentVerdict(activeAgentResult) : selected ? friendlyVerdict(selected.verdict) : "Waiting for a message"}
               </div>
-              {protectionMode === "agent" && agentResult && (
-                <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">{agentResult.summary}</p>
+              {protectionMode === "agent" && activeAgentResult && (
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">{activeAgentResult.summary}</p>
               )}
               {protectionMode === "scam" && selected && <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">{selected.summary}</p>}
-              {((protectionMode === "scam" && !selected) || (protectionMode === "agent" && !agentResult)) && (
+              {((protectionMode === "scam" && !selected) || (protectionMode === "agent" && !activeAgentResult)) && (
                 <div className="mt-3 flex flex-col gap-2.5 border-t border-[var(--line)] pt-3">
                   {(protectionMode === "agent" ? ["Agent pass/block decision", "Injection evidence", "Safe context wrapper"] : ["A clear result", "The reasons behind it", "What to do next"]).map((item) => (
                     <div key={item} className="flex items-center gap-2 text-[11px] text-zinc-400">
@@ -2112,10 +2260,10 @@ export default function GhostFilterDashboard() {
               )}
             </div>
 
-            {protectionMode === "agent" && agentResult && (
+            {protectionMode === "agent" && activeAgentResult && (
               <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
                 <div className="flex items-start gap-2.5">
-                  {agentResult.verdict === "block" ? (
+                  {activeAgentResult.verdict === "block" ? (
                     <ShieldX className="mt-0.5 h-4 w-4 shrink-0 text-[var(--danger)]" />
                   ) : (
                     <Bot className={`mt-0.5 h-4 w-4 shrink-0 ${TONE_TEXT[agentTone]}`} />
@@ -2124,14 +2272,14 @@ export default function GhostFilterDashboard() {
                     <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                       GhostGPT protection
                     </span>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-300">{agentResult.recommendation}</p>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-300">{activeAgentResult.recommendation}</p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-1.5">
                   {[
                     ["Trust zone", "Untrusted"],
-                    ["Agent risk", `${agentResult.score}%`],
-                    ["Action", agentResult.verdict === "pass" ? "Pass" : agentResult.verdict === "isolate" ? "Isolate" : "Block"],
+                    ["Agent risk", `${activeAgentResult.score}%`],
+                    ["Action", activeAgentResult.verdict === "pass" ? "Pass" : activeAgentResult.verdict === "isolate" ? "Isolate" : "Block"],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-[var(--line)] bg-[var(--input)] p-2">
                       <p className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">{label}</p>
@@ -2142,15 +2290,15 @@ export default function GhostFilterDashboard() {
               </div>
             )}
 
-            {protectionMode === "agent" && agentResult && (
+            {protectionMode === "agent" && activeAgentResult && (
               <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
                 <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <AlertTriangle className="h-3.5 w-3.5 text-[var(--warn)]" />
                   Injection findings
                 </span>
                 <div className="mt-3 space-y-2">
-                  {agentResult.findings.length ? (
-                    agentResult.findings.map((finding, index) => (
+                  {activeAgentResult.findings.length ? (
+                    activeAgentResult.findings.map((finding, index) => (
                       <div key={`${finding.label}-${index}`} className="rounded-md border border-[var(--line)] bg-[var(--input)] p-2.5">
                         <div className="flex items-center justify-between gap-2">
                           <p className={finding.severity === "red" ? "text-[11px] font-bold text-[var(--danger)]" : "text-[11px] font-bold text-[var(--warn)]"}>
@@ -2173,7 +2321,7 @@ export default function GhostFilterDashboard() {
               </div>
             )}
 
-            {protectionMode === "agent" && agentResult && (
+            {protectionMode === "agent" && activeAgentResult && (
               <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
                 <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
                   <Copy className="h-3.5 w-3.5 text-[var(--accent)]" />
@@ -2183,7 +2331,7 @@ export default function GhostFilterDashboard() {
                   This wrapper tells GhostGPT the content is untrusted data, not an instruction source.
                 </p>
                 <pre className="mt-3 max-h-44 overflow-auto rounded-md border border-[var(--line)] bg-[var(--input)] p-3 text-[9px] leading-relaxed text-zinc-500">
-                  {agentResult.sanitizedContext}
+                  {activeAgentResult.sanitizedContext}
                 </pre>
                 <button
                   onClick={copySafeContext}
@@ -2356,6 +2504,28 @@ export default function GhostFilterDashboard() {
                       &ldquo;{f.phrase}&rdquo;
                     </span>
                     <p className="text-zinc-500">{f.reason}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selected?.mlBreakdown && selected.mlBreakdown.length > 0 && (
+              <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3.5 py-3.5">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                  <BrainCircuit className="h-3.5 w-3.5 text-[var(--violet)]" />
+                  AI/ML ensemble
+                  <span className="ml-auto font-mono text-[9px] text-zinc-600">
+                    {selected.ensembleScore ?? Math.round(selected.mlScore * 100)}%
+                  </span>
+                </span>
+                {selected.mlBreakdown.slice(0, 5).map((layer) => (
+                  <div key={`${layer.label}-${layer.evidence}`} className="rounded-md border border-[var(--line)] bg-[var(--input)] p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold text-zinc-300">{layer.label}</p>
+                      <span className="font-mono text-[10px] font-bold text-[var(--violet)]">{layer.score}%</span>
+                    </div>
+                    <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{layer.explanation}</p>
+                    <p className="mt-1 truncate font-mono text-[9px] text-zinc-600">{layer.evidence}</p>
                   </div>
                 ))}
               </div>

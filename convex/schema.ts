@@ -96,9 +96,41 @@ export default defineSchema({
         ),
       })
     ),
+    ensembleScore: v.optional(v.number()),
+    mlBreakdown: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          score: v.number(),
+          evidence: v.string(),
+          explanation: v.string(),
+        })
+      )
+    ),
   })
     .index("by_owner", ["ownerId"])
     .index("by_connection_external", ["connectionId", "externalId"]),
+
+  agentScans: defineTable({
+    ownerId: v.string(),
+    source: v.union(v.literal("manual"), v.literal("file"), v.literal("api")),
+    subject: v.optional(v.string()),
+    snippet: v.string(),
+    verdict: v.union(v.literal("pass"), v.literal("isolate"), v.literal("block")),
+    score: v.number(),
+    title: v.string(),
+    summary: v.string(),
+    recommendation: v.string(),
+    findings: v.array(
+      v.object({
+        label: v.string(),
+        detail: v.string(),
+        severity: v.union(v.literal("amber"), v.literal("red")),
+        evidence: v.string(),
+      })
+    ),
+    sanitizedContext: v.string(),
+  }).index("by_owner", ["ownerId"]),
 
   scanFeedback: defineTable({
     ownerId: v.string(),

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agentScans from "../agentScans.js";
 import type * as connections from "../connections.js";
 import type * as drive from "../drive.js";
 import type * as github from "../github.js";
@@ -22,6 +23,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentScans: typeof agentScans;
   connections: typeof connections;
   drive: typeof drive;
   github: typeof github;

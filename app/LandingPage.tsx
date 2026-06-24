@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Bot,
+  BrainCircuit,
   Check,
   ChevronDown,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
   Moon,
   ScanLine,
   ShieldCheck,
+  ShieldX,
   Smartphone,
   Sun,
   Upload,
@@ -29,7 +31,7 @@ const BENEFITS = [
   {
     icon: MessageSquareText,
     title: "Scam detection for people",
-    copy: "Paste suspicious messages, emails, links, screenshots, or PDFs and get a clear verdict with evidence.",
+    copy: "Paste suspicious messages, emails, links, screenshots, or PDFs and get a clear verdict powered by classifier, rules, threat intel, and AI review.",
   },
   {
     icon: Bot,
@@ -43,6 +45,24 @@ const BENEFITS = [
   },
 ] as const;
 
+const AI_LAYERS = [
+  {
+    icon: BrainCircuit,
+    title: "ML ensemble",
+    copy: "A local classifier is combined with behavioral scam signals like payment intent, impersonation, urgency, and secret-code requests.",
+  },
+  {
+    icon: ShieldX,
+    title: "Agent firewall",
+    copy: "GhostGPT content gets pass, isolate, or block decisions plus a safe context wrapper for untrusted data.",
+  },
+  {
+    icon: ScanLine,
+    title: "Deep review",
+    copy: "High-risk items escalate to structured AI review, while link reputation and email forensics add external evidence.",
+  },
+] as const;
+
 const FAQS = [
   {
     question: "What can I check with GhostFilter?",
@@ -52,7 +72,12 @@ const FAQS = [
   {
     question: "How does GhostFilter protect GhostGPT?",
     answer:
-      "GhostFilter scans untrusted content before it reaches GhostGPT. If it finds prompt injection, secret extraction, jailbreak, or tool-abuse attempts, it recommends blocking or isolating the content and can generate a safe context wrapper.",
+      "GhostFilter scans untrusted content before it reaches GhostGPT. If it finds prompt injection, secret extraction, jailbreak, or tool-abuse attempts, it recommends pass, isolate, or block, saves the firewall run, and can generate a safe context wrapper.",
+  },
+  {
+    question: "Where is the AI/ML part?",
+    answer:
+      "Scam Shield uses a trained local classifier, deterministic social-engineering signals, link intelligence, email forensics, and selective AI review. GhostGPT Firewall adds a separate prompt-injection and tool-abuse detector.",
   },
   {
     question: "Does GhostFilter open suspicious links?",
@@ -318,6 +343,36 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b border-[var(--line)]">
+          <div className="mx-auto max-w-6xl px-5 py-12 lg:px-8">
+            <div className="mb-7 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-[11px] font-medium text-[var(--accent)]">AI/ML safety engine</p>
+                <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-[-0.035em] text-zinc-100">
+                  More than one model. A layered decision system.
+                </h2>
+              </div>
+              <p className="max-w-sm text-[11px] leading-6 text-zinc-500">
+                The scanner explains which layer fired, so the result feels inspectable instead of magical.
+              </p>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-3">
+              {AI_LAYERS.map(({ icon: Icon, title, copy }, index) => (
+                <div key={title} className="landing-tilt-card rounded-xl border border-[var(--line-strong)] bg-[var(--panel)] p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--accent)] bg-[var(--input)]">
+                      <Icon className="h-4 w-4 text-[var(--accent)]" />
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-zinc-600">0{index + 1}</span>
+                  </div>
+                  <h3 className="mt-5 text-[15px] font-semibold text-zinc-200">{title}</h3>
+                  <p className="mt-2 text-[11px] leading-6 text-zinc-500">{copy}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
