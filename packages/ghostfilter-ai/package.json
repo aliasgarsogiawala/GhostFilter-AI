@@ -1,0 +1,42 @@
+{
+  "name": "ghostfilter-ai",
+  "version": "0.1.0",
+  "description": "Safety firewall SDK for humans and AI agents — scan untrusted text for scams/phishing and prompt-injection before you (or your agent) trust it.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "bin": {
+    "ghostfilter": "./dist/bin/ghostfilter.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/bin/ghostfilter.js",
+    "dev:cli": "tsx bin/ghostfilter.ts"
+  },
+  "keywords": [
+    "ai-safety",
+    "prompt-injection",
+    "scam-detection",
+    "phishing",
+    "llm-security",
+    "agent-firewall"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5",
+    "tsx": "^4.22.4"
+  }
+}

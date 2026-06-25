@@ -123,14 +123,13 @@ are caught by the payment-intent + unverified-identity layers even if the statis
 | Manual message scanner | Live | Paste SMS, chat messages, emails, or links. |
 | File scanner | Live | Reads screenshots/images, PDFs, `.eml`, and text files for scam analysis. |
 | Gmail | Live | Read-only OAuth scan of recent inbox messages. |
-| Outlook | Live when Microsoft OAuth is configured | Read-only OAuth scan of recent Microsoft inbox messages. |
+| Outlook | Coming soon | Enterprise mail connector is prepared in code, but kept out of the live demo because Microsoft tenant setup is unreliable for personal accounts. |
 | Slack | Live when Slack OAuth is configured | Read-only workspace scan of recent channel/DM text the app is allowed to access. |
 | Google Drive | Live | Read-only scan of recent Drive files/metadata. |
 | GitHub | Live | Read-only scan of notification-style security/social-engineering messages. |
 | VirusTotal | Live when key is set | Checks domain reputation for links. |
 | urlscan.io | Live when key is set | Creates a sandboxed page preview for suspicious links. |
 | WhatsApp / Telegram / Discord / SMS lanes | Manual paste | Browsers cannot read private chats automatically, so GhostFilter supports paste lanes. |
-| Outlook / Slack | Roadmap UI | Shown as next integration lanes for the product direction. |
 | Browser/Slack/Outlook agent gateway | Roadmap | Extend the GhostGPT firewall to more external context sources. |
 
 ## How it works
@@ -270,6 +269,9 @@ browser-extension/
 scripts/
   train-classifier.ts          Offline classifier training
   download-corpus.sh           Optional public corpus download
+
+packages/
+  ghostfilter-ai/               Standalone npm SDK + CLI (vendored detection engine)
 ```
 
 ## Setup
@@ -316,8 +318,8 @@ Create `.env.local`.
 | `GOOGLE_CLIENT_SECRET` | For Gmail/Drive | Google OAuth secret. Also set in Convex. |
 | `GITHUB_CLIENT_ID` | For GitHub | GitHub OAuth client ID. |
 | `GITHUB_CLIENT_SECRET` | For GitHub | GitHub OAuth secret. |
-| `MICROSOFT_CLIENT_ID` | For Outlook | Microsoft app client ID. |
-| `MICROSOFT_CLIENT_SECRET` | For Outlook | Microsoft app secret. |
+| `MICROSOFT_CLIENT_ID` | Optional / roadmap | Microsoft app client ID for the future Outlook connector. Not needed for the hackathon demo. |
+| `MICROSOFT_CLIENT_SECRET` | Optional / roadmap | Microsoft app secret for the future Outlook connector. Not needed for the hackathon demo. |
 | `SLACK_CLIENT_ID` | For Slack | Slack app client ID. |
 | `SLACK_CLIENT_SECRET` | For Slack | Slack app secret. |
 | `VIRUSTOTAL_API_KEY` | Optional | Domain reputation checks. Set in Convex for actions. |
@@ -346,7 +348,7 @@ GitHub OAuth callback URL for local development:
 http://localhost:3000/api/auth/github/callback
 ```
 
-Microsoft OAuth redirect URI for local development:
+Future Microsoft OAuth redirect URI for local development:
 
 ```text
 http://localhost:3000/api/auth/outlook/callback
@@ -371,6 +373,31 @@ The classifier can train on:
 - optional SpamAssassin email corpus downloaded by the script
 
 Only the trained weights are committed. The raw corpus is re-downloadable and ignored by git.
+
+## Developer SDK: `ghostfilter-ai`
+
+The same detection engine is also published as a standalone npm package in
+[`packages/ghostfilter-ai`](packages/ghostfilter-ai), for developers who want to add
+GhostFilter protection to their own apps, CLIs, or AI agents without running this whole
+project. It covers both threat classes above — scams/phishing aimed at people and
+prompt-injection/unsafe tool-use instructions aimed at AI agents — and runs fully locally
+with the same trained classifier and heuristics, so no API key is required.
+
+```bash
+npm install ghostfilter-ai
+```
+
+```ts
+import { ghostfilter } from "ghostfilter-ai";
+
+const result = await ghostfilter.protect({ input: "...", mode: "full" });
+```
+
+It also ships a `ghostfilter` CLI (`ghostfilter scan`, `ghostfilter pipe`, `ghostfilter guard`)
+and can optionally call this app's `/api/ghostgpt/firewall` endpoint instead of running
+locally when `GHOSTFILTER_API_URL` is set. See
+[`packages/ghostfilter-ai/README.md`](packages/ghostfilter-ai/README.md) for the full API,
+CLI usage, and result shape.
 
 ## Privacy and safety
 

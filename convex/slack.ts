@@ -8,8 +8,11 @@ import { runPipeline } from "./pipeline";
 interface SlackConversation {
   id: string;
   name?: string;
+  is_channel?: boolean;
+  is_private?: boolean;
   is_im?: boolean;
   is_mpim?: boolean;
+  is_member?: boolean;
 }
 
 interface SlackMessage {
@@ -19,6 +22,12 @@ interface SlackMessage {
   bot_id?: string;
 }
 
+class SlackApiError extends Error {
+  constructor(public code: string) {
+    super(`Slack API error: ${code}`);
+  }
+}
+
 async function slackApi<T>(token: string, path: string, params: Record<string, string>) {
   const url = new URL(`https://slack.com/api/${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -26,7 +35,7 @@ async function slackApi<T>(token: string, path: string, params: Record<string, s
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = (await res.json()) as T & { ok?: boolean; error?: string };
-  if (!json.ok) throw new Error(`Slack API error: ${json.error ?? res.status}`);
+  if (!json.ok) throw new SlackApiError(json.error ?? String(res.status));
   return json;
 }
 
@@ -46,6 +55,7 @@ export const scanWorkspace = action({
       {
         limit: String(maxChannels),
         types: "public_channel,private_channel,im,mpim",
+        exclude_archived: "true",
       }
     );
 
@@ -53,14 +63,29 @@ export const scanWorkspace = action({
     let scanned = 0;
 
     for (const conversation of conversations.channels ?? []) {
-      const history = await slackApi<{ messages?: SlackMessage[] }>(
-        connection.accessToken,
-        "conversations.history",
-        {
-          channel: conversation.id,
-          limit: String(MAX_MESSAGES_PER_CHANNEL),
+      if ((conversation.is_channel || conversation.is_private) && conversation.is_member === false) {
+        continue;
+      }
+
+      let history: { messages?: SlackMessage[] };
+      try {
+        history = await slackApi<{ messages?: SlackMessage[] }>(
+          connection.accessToken,
+          "conversations.history",
+          {
+            channel: conversation.id,
+            limit: String(MAX_MESSAGES_PER_CHANNEL),
+          }
+        );
+      } catch (error) {
+        if (
+          error instanceof SlackApiError &&
+          ["not_in_channel", "channel_not_found", "is_archived", "missing_scope"].includes(error.code)
+        ) {
+          continue;
         }
-      );
+        throw error;
+      }
       const messages = history.messages ?? [];
       total += messages.length;
 

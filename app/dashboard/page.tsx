@@ -9,7 +9,6 @@ import {
   Mail,
   Code2,
   Plug,
-  Unlink,
   Scan,
   Inbox,
   ShieldCheck,
@@ -484,11 +483,11 @@ const CONNECTION_LANES = [
   {
     id: "outlook",
     label: "Outlook",
-    sub: "Microsoft mail",
+    sub: "Enterprise mail",
     icon: Mail,
-    status: "Live",
+    status: "Soon",
     tone: "info",
-    detail: "Scan Microsoft inbox messages for phishing, KYC scams, fake invoices, and agent-injection text.",
+    detail: "Enterprise connector is ready in code, but hidden from the demo until Microsoft tenant setup is reliable.",
   },
   {
     id: "slack",
@@ -535,12 +534,6 @@ const CONNECTION_LANES = [
     tone: "info",
     detail: "Upload screenshots, PDFs, EML files, or text files for extraction and review.",
   },
-] as const;
-
-const JUDGE_POINTS = [
-  ["7 scan lanes", "messages, email, links, files, Drive, GitHub, chat"],
-  ["Evidence first", "plain-English reasons plus optional technical details"],
-  ["Safe actions", "checklist, report export, share, and feedback loop"],
 ] as const;
 
 // ----------------------------------------------------------------------------
@@ -716,27 +709,6 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
   );
 }
 
-function DepthCard({
-  children,
-  className = "",
-  hover = true,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  hover?: boolean;
-}) {
-  return (
-    <motion.div
-      whileHover={hover ? { y: -3, rotateX: 1.4, rotateY: -1.4 } : undefined}
-      transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      style={{ transformPerspective: 900 }}
-      className={`rounded-xl border-[1.5px] border-[var(--line-strong)] bg-[var(--panel)] shadow-[5px_5px_0_0_#050507] ${className}`}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
 function toneColor(tone: "accent" | "info" | "violet" | "warn") {
   if (tone === "info") return "var(--info)";
   if (tone === "violet") return "var(--violet)";
@@ -744,42 +716,34 @@ function toneColor(tone: "accent" | "info" | "violet" | "warn") {
   return "var(--accent)";
 }
 
-function LaneCard({
+function ConnectorMiniCard({
   lane,
-  action,
   active,
+  children,
 }: {
   lane: (typeof CONNECTION_LANES)[number];
-  action?: React.ReactNode;
   active?: boolean;
+  children: React.ReactNode;
 }) {
   const Icon = lane.icon;
   const color = toneColor(lane.tone);
   return (
-    <DepthCard className={`p-3 ${active ? "border-[var(--accent)]" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-[var(--input)]"
-            style={{ borderColor: color, color, boxShadow: `2px 2px 0 0 ${color}` }}
-          >
-            <Icon className="h-4 w-4" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-[12px] font-bold text-zinc-200">{lane.label}</p>
-            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600">{lane.sub}</p>
-          </div>
-        </div>
+    <div className={`rounded-lg border bg-[var(--input)] p-2.5 ${active ? "border-[var(--accent)]" : "border-[var(--line)]"}`}>
+      <div className="flex items-center gap-2">
         <span
-          className="shrink-0 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wide"
-          style={{ borderColor: color, color }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-[var(--panel)]"
+          style={{ borderColor: active ? color : "var(--line-strong)", color: active ? color : "#71717a" }}
         >
-          {lane.status}
+          <Icon className="h-3.5 w-3.5" />
         </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[11px] font-bold text-zinc-200">{lane.label}</span>
+          <span className="block truncate text-[9px] text-zinc-600">{active ? "Connected" : lane.sub}</span>
+        </span>
+        <span className={`h-2 w-2 rounded-full ${active ? "bg-[var(--accent)]" : "bg-zinc-700"}`} />
       </div>
-      <p className="mt-3 min-h-10 text-[10px] leading-relaxed text-zinc-500">{lane.detail}</p>
-      {action && <div className="mt-3">{action}</div>}
-    </DepthCard>
+      <div className="mt-2 flex flex-wrap gap-1.5">{children}</div>
+    </div>
   );
 }
 
@@ -890,10 +854,9 @@ function ConnectButton({
   return (
     <a
       href={href}
-      className="group flex items-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-3 py-2 text-[11px] font-semibold text-zinc-200 transition-transform hover:-translate-y-0.5 hover:border-[var(--accent)]"
-      style={{ boxShadow: "2px 2px 0 0 #000" }}
+      className="group flex items-center gap-1.5 rounded border border-[var(--line-strong)] bg-[var(--panel)] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className="h-3 w-3" />
       {label}
       {sub && <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-600 group-hover:text-[var(--accent-bright)]">{sub}</span>}
     </a>
@@ -1037,7 +1000,6 @@ export default function GhostFilterDashboard() {
 
   const gmailConnection = connections?.find((c) => c.provider === "gmail" && c.status === "connected");
   const githubConnection = connections?.find((c) => c.provider === "github" && c.status === "connected");
-  const outlookConnection = connections?.find((c) => c.provider === "outlook" && c.status === "connected");
   const slackConnection = connections?.find((c) => c.provider === "slack" && c.status === "connected");
   const selected =
     protectionMode === "scam"
@@ -1422,6 +1384,10 @@ export default function GhostFilterDashboard() {
   const completedPlanCount = selected
     ? actionPlan.filter((_, index) => completedSafetyActions[`${selected._id}:${index}`]).length
     : 0;
+  const sidebarConnectors = CONNECTION_LANES.filter((lane) =>
+    ["google", "github", "outlook", "slack"].includes(lane.id)
+  );
+  const hasConnectedSource = !!(gmailConnection || githubConnection || slackConnection);
 
   return (
     <div className="dashboard-page min-h-screen w-full bg-[var(--ink)] text-zinc-300">
@@ -1463,14 +1429,14 @@ export default function GhostFilterDashboard() {
         </div>
       </header>
 
-      <main className="relative z-10 grid grid-cols-1 lg:grid-cols-12">
+      <main className="relative z-10 grid grid-cols-1 lg:h-[calc(100vh-73px)] lg:grid-cols-12 lg:overflow-hidden">
         {/* ZONE A — Recent Scans */}
         <motion.section
           id="recent-scans-sidebar"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className={`order-2 col-span-1 flex flex-col border-b border-[var(--line)] transition-[height] lg:order-1 lg:h-[calc(100vh-73px)] lg:border-b-0 lg:border-r-[1.5px] ${
+          className={`order-2 col-span-1 flex flex-col border-b border-[var(--line)] transition-[height] lg:order-1 lg:h-full lg:min-h-0 lg:overflow-hidden lg:border-b-0 lg:border-r-[1.5px] ${
             historyOpen ? "h-[430px] lg:col-span-3" : "h-[49px] lg:col-span-1"
           }`}
         >
@@ -1504,7 +1470,7 @@ export default function GhostFilterDashboard() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex min-h-0 flex-1 flex-col"
+                className="flex min-h-0 flex-1 flex-col overflow-y-auto"
               >
                 {scanCounts.all > 0 && (
                   <div className="border-b border-[var(--line)] p-2.5">
@@ -1627,6 +1593,109 @@ export default function GhostFilterDashboard() {
                         <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{copy}</p>
                       </div>
                     ))}
+                  </div>
+                </details>
+                <details open className="mx-2 mt-2 rounded-lg border border-[var(--line)] bg-[var(--panel)]">
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
+                    <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                      <Plug className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      Connected apps
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-zinc-600" />
+                  </summary>
+                  <div className="space-y-2 border-t border-[var(--line)] p-2.5">
+                    {sidebarConnectors.map((lane) => {
+                      if (lane.id === "google") {
+                        return (
+                          <ConnectorMiniCard key={lane.id} lane={lane} active={!!gmailConnection}>
+                            {gmailConnection ? (
+                              <>
+                                <ScanButton label="Inbox" busy={scanningKind === "inbox"} disabled={!!scanningKind} onClick={() => runScan("inbox")} />
+                                <ScanButton label="Drive" busy={scanningKind === "drive"} disabled={!!scanningKind} onClick={() => runScan("drive")} />
+                                <button
+                                  onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
+                                  className="rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                                >
+                                  Off
+                                </button>
+                              </>
+                            ) : (
+                              ownerId && <ConnectButton href={`/api/auth/google?ownerId=${ownerId}`} icon={Mail} label="Connect" />
+                            )}
+                          </ConnectorMiniCard>
+                        );
+                      }
+                      if (lane.id === "github") {
+                        return (
+                          <ConnectorMiniCard key={lane.id} lane={lane} active={!!githubConnection}>
+                            {githubConnection ? (
+                              <>
+                                <ScanButton label="Scan" busy={scanningKind === "github"} disabled={!!scanningKind} onClick={() => runScan("github")} />
+                                <button
+                                  onClick={() => handleDisconnect(githubConnection._id, "GitHub")}
+                                  className="rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                                >
+                                  Off
+                                </button>
+                              </>
+                            ) : (
+                              ownerId && <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect" />
+                            )}
+                          </ConnectorMiniCard>
+                        );
+                      }
+                      if (lane.id === "outlook") {
+                        return (
+                          <ConnectorMiniCard key={lane.id} lane={lane}>
+                            <span className="rounded border border-dashed border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-600">
+                              Coming soon
+                            </span>
+                          </ConnectorMiniCard>
+                        );
+                      }
+                      return (
+                        <ConnectorMiniCard key={lane.id} lane={lane} active={!!slackConnection}>
+                          {slackConnection ? (
+                            <>
+                              <ScanButton label="Scan" busy={scanningKind === "slack"} disabled={!!scanningKind} onClick={() => runScan("slack")} />
+                              <button
+                                onClick={() => handleDisconnect(slackConnection._id, "Slack")}
+                                className="rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                              >
+                                Off
+                              </button>
+                            </>
+                          ) : (
+                            ownerId && <ConnectButton href={`/api/auth/slack?ownerId=${ownerId}`} icon={MessagesSquare} label="Connect" />
+                          )}
+                        </ConnectorMiniCard>
+                      );
+                    })}
+                    {hasConnectedSource && (
+                      <div className="flex items-center justify-between rounded-md border border-[var(--line)] bg-[var(--input)] px-2.5 py-2">
+                        <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-600">Items per scan</span>
+                        <div className="flex overflow-hidden rounded border border-[var(--line)]">
+                          {[10, 25, 50].map((n) => (
+                            <button
+                              key={n}
+                              onClick={() => setScanDepth(n)}
+                              className={`px-2 py-1 text-[10px] font-bold tabular-nums ${
+                                scanDepth === n
+                                  ? "bg-[var(--accent)] text-[var(--accent-ink)]"
+                                  : "bg-[var(--panel)] text-zinc-500 hover:text-zinc-200"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {scanError && (
+                      <p className="break-words rounded-md border border-[#ef4060]/40 bg-[#1a0c10] px-2.5 py-2 text-[10px] font-semibold text-[#ef4060]" role="alert">
+                        {scanError}
+                      </p>
+                    )}
                   </div>
                 </details>
                 <div className="mx-2 mt-2 rounded-lg border border-[var(--line)] bg-[var(--panel)]">
@@ -1798,202 +1867,10 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-          className={`order-1 col-span-1 flex flex-col border-b border-[var(--line)] lg:order-2 lg:h-[calc(100vh-73px)] lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px] ${
+          className={`order-1 col-span-1 flex flex-col border-b border-[var(--line)] lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r-[1.5px] ${
             historyOpen ? "lg:col-span-6" : "lg:col-span-8"
           }`}
         >
-          <details open className="group order-5 border-b border-[var(--line)] bg-[var(--panel)]">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5">
-              <span className="flex items-center gap-2">
-                <Plug className="h-4 w-4 text-[var(--accent)]" />
-                <span className="text-[12px] font-semibold text-zinc-300">Check connected sources</span>
-                <span className="text-[10px] text-zinc-600">Optional</span>
-              </span>
-              <ChevronDown className="h-4 w-4 text-zinc-600 transition-transform group-open:rotate-180" />
-            </summary>
-          <div className="border-t border-[var(--line)] px-5 py-4">
-            <div className="mb-4 grid gap-2 sm:grid-cols-3">
-              {JUDGE_POINTS.map(([label, copy]) => (
-                <div key={label} className="rounded-lg border border-[var(--line)] bg-[var(--input)] p-3 shadow-[3px_3px_0_0_#050507]">
-                  <p className="font-mono text-[18px] font-black tracking-[-0.05em] text-[var(--accent-bright)]">{label}</p>
-                  <p className="mt-1 text-[9px] leading-relaxed text-zinc-500">{copy}</p>
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {CONNECTION_LANES.map((lane) => {
-                if (lane.id === "google") {
-                  return (
-                    <LaneCard
-                      key={lane.id}
-                      lane={lane}
-                      active={!!gmailConnection}
-                      action={
-                        gmailConnection ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            <ScanButton label="Inbox" busy={scanningKind === "inbox"} disabled={!!scanningKind} onClick={() => runScan("inbox")} />
-                            <ScanButton label="Drive" busy={scanningKind === "drive"} disabled={!!scanningKind} onClick={() => runScan("drive")} />
-                            <button
-                              onClick={() => handleDisconnect(gmailConnection._id, "Google (Gmail + Drive)")}
-                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
-                            >
-                              <Unlink className="h-3 w-3" />
-                              Off
-                            </button>
-                          </div>
-                        ) : (
-                          ownerId && <ConnectButton href={`/api/auth/google?ownerId=${ownerId}`} icon={Mail} label="Connect" sub="OAuth" />
-                        )
-                      }
-                    />
-                  );
-                }
-                if (lane.id === "github") {
-                  return (
-                    <LaneCard
-                      key={lane.id}
-                      lane={lane}
-                      active={!!githubConnection}
-                      action={
-                        githubConnection ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            <ScanButton label="Scan" busy={scanningKind === "github"} disabled={!!scanningKind} onClick={() => runScan("github")} />
-                            <button
-                              onClick={() => handleDisconnect(githubConnection._id, "GitHub")}
-                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
-                            >
-                              <Unlink className="h-3 w-3" />
-                              Off
-                            </button>
-                          </div>
-                        ) : (
-                          ownerId && <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect" sub="OAuth" />
-                        )
-                      }
-                    />
-                  );
-                }
-                if (lane.id === "outlook") {
-                  return (
-                    <LaneCard
-                      key={lane.id}
-                      lane={lane}
-                      active={!!outlookConnection}
-                      action={
-                        outlookConnection ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            <ScanButton label="Inbox" busy={scanningKind === "outlook"} disabled={!!scanningKind} onClick={() => runScan("outlook")} />
-                            <button
-                              onClick={() => handleDisconnect(outlookConnection._id, "Outlook")}
-                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
-                            >
-                              <Unlink className="h-3 w-3" />
-                              Off
-                            </button>
-                          </div>
-                        ) : (
-                          ownerId && <ConnectButton href={`/api/auth/outlook?ownerId=${ownerId}`} icon={Mail} label="Connect" sub="OAuth" />
-                        )
-                      }
-                    />
-                  );
-                }
-                if (lane.id === "slack") {
-                  return (
-                    <LaneCard
-                      key={lane.id}
-                      lane={lane}
-                      active={!!slackConnection}
-                      action={
-                        slackConnection ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            <ScanButton label="Scan" busy={scanningKind === "slack"} disabled={!!scanningKind} onClick={() => runScan("slack")} />
-                            <button
-                              onClick={() => handleDisconnect(slackConnection._id, "Slack")}
-                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
-                            >
-                              <Unlink className="h-3 w-3" />
-                              Off
-                            </button>
-                          </div>
-                        ) : (
-                          ownerId && <ConnectButton href={`/api/auth/slack?ownerId=${ownerId}`} icon={MessagesSquare} label="Connect" sub="OAuth" />
-                        )
-                      }
-                    />
-                  );
-                }
-                if (lane.id === "files") {
-                  return (
-                    <LaneCard
-                      key={lane.id}
-                      lane={lane}
-                      action={
-                        <button
-                          onClick={() => chooseMode("file")}
-                          className="w-full rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-2 py-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[var(--info)] hover:text-[var(--info)]"
-                        >
-                          Upload file
-                        </button>
-                      }
-                    />
-                  );
-                }
-                const manualMatch = MANUAL_CHANNELS.find((channel) => channel.label.toLowerCase().includes(lane.label.toLowerCase()));
-                return (
-                  <LaneCard
-                    key={lane.id}
-                    lane={lane}
-                    action={
-                      lane.status === "Paste" && manualMatch ? (
-                        <button
-                          onClick={() => pickChannel(manualMatch.label)}
-                          className="w-full rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-2 py-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[var(--accent)] hover:text-[var(--accent-bright)]"
-                        >
-                          Paste message
-                        </button>
-                      ) : (
-                        <span className="block rounded-md border border-dashed border-[var(--line)] px-2 py-1.5 text-center text-[9px] font-bold uppercase tracking-wide text-zinc-600">
-                          Roadmap ready
-                        </span>
-                      )
-                    }
-                  />
-                );
-              })}
-            </div>
-          </div>
-
-          {(gmailConnection || githubConnection) && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)] px-5 py-3">
-              <span className="text-[10px] font-semibold text-zinc-500">
-                Items to check
-              </span>
-              <div className="flex overflow-hidden rounded-md border border-[var(--line)]">
-                {[10, 25, 50].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setScanDepth(n)}
-                    className={`px-2.5 py-1 text-[11px] font-bold tabular-nums transition-colors ${
-                      scanDepth === n
-                        ? "bg-[var(--accent)] text-[var(--accent-ink)]"
-                        : "bg-[var(--panel)] text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <span className="text-[10px] text-zinc-600">most recent</span>
-            </div>
-          )}
-          {scanError && (
-            <p className="border-t border-[var(--line)] bg-[#1a0c10] px-5 py-2 text-[11px] font-semibold text-[#ef4060]" role="alert">
-              {scanError}
-            </p>
-          )}
-          </details>
-
           {/* Channels that can't be auto-connected (no API to read personal messages) —
               honest manual-paste path instead of fake "connect" buttons. */}
           <div className="order-4 border-b border-[var(--line)] px-5 py-3">
@@ -2348,7 +2225,7 @@ export default function GhostFilterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.16 }}
-          className="order-3 col-span-1 flex flex-col lg:col-span-3 lg:h-[calc(100vh-73px)] lg:overflow-y-auto"
+          className="order-3 col-span-1 flex flex-col lg:col-span-3 lg:h-full lg:min-h-0 lg:overflow-y-auto"
         >
           <SectionLabel icon={ShieldAlert}>Your result</SectionLabel>
           <div className="flex flex-col gap-4 px-4 py-4">

@@ -1,0 +1,229 @@
+// Scam / phishing detector. Vendored and trimmed from the main GhostFilter app's
+// lib/ml-classifier.ts + lib/features.ts + lib/socialEngineering.ts + lib/scamEnsemble.ts
+// so this package has zero runtime dependency on the Next.js/Convex app — it just needs
+// the trained weights and the same deterministic feature/regex logic.
+import type { ProtectResult } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// Trained logistic-regression weights (SMS Spam Collection + SpamAssassin corpus,
+// ~94% test accuracy — see the main repo's scripts/train-classifier.ts).
+// ---------------------------------------------------------------------------
+const ML_WEIGHTS = {
+  vocab: [
+    "guaranteed","receive","removed","mailings","credit","marketing","nbsp","remove","mortgage","removal",
+    "opt","nextpart","fill","cash","below","our","offers","rates","offer","reply","please","contact","quot",
+    "deathtospamdeathtospamdeathtospam","investment","dollars","wish","insurance","form","transfer","opportunity",
+    "visit","sightings","professional","low","multi","income","purchase","lowest","loan","interest","debt",
+    "encoding","money","financial","obligation","communication","click","business","iso","claim","monthly",
+    "free","hours","cost","sincerely","refinance","loans","rate","risk","earn","future","assistance","prices",
+    "toll","optout","won","urgent","printable","state","million","call","city","emails","within","customer",
+    "fax","adv","txt","price","yours","prize","special","thank","shipping","name","address","order","guarantee",
+    "per","quoted","increase","company","service","payment","ad","absolutely","confidential","promotion","mime",
+    "bills","age","yourself","hundreds","lenders","further","dear","charset","save","required","account",
+    "approved","sales","here","proven","legal","receiving","products","format","weight","lose","private","quote",
+    "pay","minute","loss","paid","website","bonus","mobile","instructions","companies","simply","fees",
+    "opportunities","health","online","month","ly","profitable","invest","orders","act","telephone","clicking",
+    "po","savings","united","limited","bank",
+  ],
+  mean: [
+    5.614302290118917,120.2292877125027,0.8825048418334409,1.1638691629007962,0.026452080371565163,0.06624434852139086,0.666774262965354,0.6767807187432753,0.02173445233483968,0.05412093823972455,0.053044975252851304,0.018398967075532603,0.02948138584032709,0.02442435980202281,0.06509576070583172,0.05455132343447385,0.012588766946417043,0.0171078114912847,0.019259737465031204,0.022918011620400257,0.02248762642565096,0.023240800516462233,0.04562083064342587,0.1428878846567678,0.02646868947708199,0.023778782009898858,0.03819668603400043,0.0487411233053583,0.11469765440068862,0.03970303421562298,0.011512803959543792,0.009683666881859263,0.013879922530664945,0.019044544867656554,0.044437271357865286,0.014525500322788897,0.03959543791693566,0.04508284914998924,0.0179685818807833,0.0329244673983215,0.010759629868732516,0.017753389283408652,0.03152571551538627,0.02797503765870454,0.014848289218850872,0.016785022595222725,0.012158381751667743,0.010006455777921239,0.02313320421777491,0.01086722616741984,0.03819668603400043,0.05530449752528513,0.017860985582095975,0.010974822466107165,0.012050785452980417,0.12717882504841835,0.06272864213471056,0.028082633957391866,0.020766085646653755,0.011405207660856467,0.13309662147622123,0.032386485904884875,0.031740908112760924,0.009576070583171939,0.0071013557133634605,0.0073165483107381106,0.026038304282332687,0.016785022595222725,0.009038089089735314,0.04336130837099204,0.008177318700236712,0.016569829997848073,0.008069722401549387,0.006993759414676135,0.010006455777921239,0.012265978050355068,0.02108887454271573,0.03486120077469335,0.030342156229825695,0.09221002797503766,0.018291370776845277,0.01377232623197762,0.03367764148913278,0.017215407789972024,0.021411663438777706,0.00796212610286206,0.017753389283408652,0.030557348827200344,0.01355713363460297,0.00936087798579729,0.03367764148913278,0.023240800516462233,0.012158381751667743,0.060899505057026036,0.06100710135571336,0.03970303421562298,0.01022164837529589,0.043146115773617384,0.022272433828276306,0.013664729933290294,0.04605121583817517,0.05013987518829352,0.00979126318054659,0.016785022595222725,0.013664729933290294,0.010974822466107165,0.007208952012050785,0.027652248762642564,0.007639337206800086,0.014310307725414246,0.025392726490208736,0.01312674843985367,0.005917796427802884,0.023886378308586184,0.03281687109963417,0.04217774908543146,0.02646868947708199,0.01979771895846783,0.024101570905960833,0.00979126318054659,0.017000215192597375,0.15902732945986658,0.008392511297611363,0.021411663438777706,0.030342156229825695,0.02711426726920594,0.03066494512588767,0.008284914998924036,0.012696363245104368,0.017538196686034,0.014202711426726921,0.029051000645577793,0.014525500322788897,0.011405207660856467,0.01312674843985367,0.023240800516462233,0.008715300193673338,0.019474930062405853,0.014848289218850872,0.025823111684958037,0.031202926619324296,0.007531740908112761,0.008607703894986012,0.010544437271357865,0.043146115773617384,0.032386485904884875,0.005702603830428234,0.005917796427802884,0.006778566817301485,0.01086722616741984,0.0188293522702819,0.009038089089735314,0.008607703894986012,0.0071013557133634605,0.00688616311598881,0.01732300408865935,0.0166774262965354,0.013019152141166343,
+  ],
+  std: [
+    1.6238630734995463,162.06587286469306,1.7497792687896774,3.6412360370987304,0.04655220546690245,0.09148299633314648,9.076611259100952,1.2074052978034862,0.14581517725032536,0.22625618728285163,0.22412319347463078,0.13438915538869786,0.16915151116459495,0.15436259407734035,0.2466947560122961,0.22710234817371427,0.11149120993687026,0.1296731825678009,0.1374365307253016,0.14964216105019196,0.14826305366946047,0.15066740094599596,0.20866137748714744,0.3499584790729856,0.1605244465944427,0.15235928437749266,0.19167080948862858,0.21532632492169795,0.31865671572347765,0.1952606035269009,0.10667829818915815,0.09792800149895314,0.1169926078058179,0.13668156488144162,0.20606455365281437,0.11964326208843848,0.1950067670956567,0.20748586906706507,0.13283716327134815,0.17843891628469158,0.10316908564982928,0.13205380135520975,0.1747336395106313,0.1649012884325131,0.12094551470032026,0.12846511437623764,0.10959267997839386,0.09953053109817017,0.1503265082425294,0.10367800906097935,0.19167080948862858,0.22857364257226356,0.13244610517540664,0.10418433537698171,0.10911262082337395,0.3331731854572155,0.24247424521099295,0.16520895746721193,0.14260033426879917,0.10618440986824745,0.3396791292202776,0.1770242961731969,0.1753095059172079,0.09738772743707906,0.08396979492886107,0.0852233326710128,0.159249210335367,0.1284651143762364,0.09463826940166302,0.20366910739567606,0.09005803772630061,0.12765293076029263,0.08946844126233716,0.08333574709525868,0.09953053109816878,0.11007054025861751,0.1436806664559972,0.18342818064635924,0.17152699433370042,0.28932220570821343,0.13400297210119178,0.11654462348017922,0.1803980541825855,0.1300732006394725,0.14475221624403647,0.08887480323907561,0.13205380135520872,0.1721150698220565,0.11564314835829241,0.09629772556572287,0.18039805418258675,0.15066740094599515,0.10959267997839489,0.2391458871501399,0.2393433411229429,0.19526060352690197,0.10058412538660431,0.20318594554559502,0.14756819616585437,0.11609481077611895,0.20959604327848722,0.21823351737164454,0.09846519357558316,0.12846511437623612,0.11609481077612104,0.10418433537698127,0.08459895402981513,0.16397439404067948,0.08706881033895408,0.11876667385348069,0.1573147670487394,0.1138175597842963,0.07669925757947138,0.15269518407562366,0.17815702082954823,0.20099449387361776,0.16052444659444118,0.13930459174955004,0.15336454996453072,0.09846519357558531,0.12927183713400678,0.3657015695136136,0.09122541889041008,0.1447522162440364,0.17152699433370197,0.1624163901201628,0.17240825463507914,0.09064367149659974,0.11196055379219076,0.13126541183050572,0.11832579775711476,0.1679495162454273,0.11964326208843676,0.1061844098682467,0.11381755978429732,0.15066740094599226,0.09294807010479997,0.13818703687925968,0.12094551470032035,0.15860730937715667,0.17386576428299427,0.0864581620612225,0.09237754775183972,0.1021432920655462,0.2031859455455964,0.17702429617319645,0.07529996108885341,0.07669925757947252,0.08205253103471831,0.10367800906097954,0.13592206503493404,0.09463826940166123,0.09237754775184201,0.08396979492886085,0.08269669808118377,0.13047190355782096,0.12805971165303848,0.11335631353697818,
+  ],
+  weights: [
+    0.4722822689157092,-1.8890420332863942,-0.774483359557939,0.9956385589959433,0.9513525980627354,0.33122925645081414,-0.34776758809317065,0.28761208258729587,0.4758390470368393,0.21774114318664994,0.3393754300790597,0.30314764018714246,0.17454788599400775,0.2735558651031754,0.2578101297484581,0.36671462402665844,0.4346293312924205,0.12004849179478122,0.2866310431408037,0.36484264764942737,0.20357331203405044,0.08435861769281876,0.2226117498810013,0.4292679926872207,0.15639918075470033,0.004944460294588707,0.10023099680671504,0.47055394861879396,0.312752321118682,0.16539092775049818,0.28830653926011,0.4403688247417838,0.36169960417618463,0.09910408387889023,0.013689834996614447,0.15822405275056042,-0.0027279255648235442,0.10930550057502324,0.16098717305931223,0.23025480459862468,0.23197419603324176,-0.005506725744655513,0.056237163356151566,0.14526813627166818,-0.06361041967577907,0.20074184584843524,-0.01750357290441138,0.26047480813059953,0.07856205327270153,0.10233565258901064,0.10366886043293248,0.13142819434468414,0.06035544139320161,-0.1991439994765542,0.028662901620930898,-0.15520169272515638,0.09119738758033373,0.19497171366313948,0.141433840091721,0.11783972997946038,0.3178639967108657,0.2076828240652284,0.2097376925383193,0.3061204992933905,0.10119288016384237,0.14565355000056435,0.038173953030645726,0.07962304615786091,0.09366893345501383,0.11141620911171285,0.25003334596961657,-0.08048678085709265,0.16150448406425144,0.21765904312203696,0.13464405844095054,0.09988227284929925,-0.08944660067306424,-0.017963038178381564,-0.0808367674763686,0.2584195555930733,-0.25009551581189754,-0.04623277719588696,0.0976726093894633,0.1940923731602703,0.08618654327251306,0.0015006909015620258,0.3150770086526567,0.108408075306576,0.09660265540064662,-0.00669954576644446,0.11261449858310295,0.031108188238395822,-0.16797787431651656,0.039725575741117354,-0.2252263327493579,0.14278173634866098,-0.0011351175641460033,0.039426750563613805,-0.0780294917594183,0.12286637833422048,-0.07685453011533733,0.09442510906585164,0.1526198045681051,0.2813172406295121,0.11483572255537951,-0.009603584889098123,0.1008457266236488,-0.1858467207141883,-0.04468187911342092,0.19410503123055703,0.14488870148394695,-0.004059202916384775,0.12681547084740744,0.0466461790767857,0.09006570801770293,-0.17287513355988252,0.05575177649086809,-0.10817373955876178,-0.237347240793077,-0.0035388268353833564,-0.004966071314111815,0.25157009678827547,-0.02940048306308512,-0.07825765545208392,-0.050013536925768855,-0.22142934832404934,0.04759238162949451,0.21900048275144562,0.049409961873665864,0.1283626523367756,0.025558554487349897,0.061367587975330845,0.15139033907332142,0.0508286479385953,0.07706950837857228,0.18409208038100244,0.06646267935153986,0.28371635268828754,0.08006898998351954,0.031837138183299175,-0.05051168688748149,0.07459298089332878,0.11518711024861242,0.06847685559195926,0.035722540266437,-0.21640599430008142,0.27213734890753394,0.14983323670714205,0.43056599018247477,-0.026490308563367166,-0.03399243803187589,0.0527225448826566,0.0861370329446929,0.43215051519920394,-0.11192169541798629,0.15251441281047687,0.014693612711551405,0.029862544758428953,
+  ],
+  bias: -0.6981554719654449,
+};
+
+const URGENCY_KEYWORDS = [
+  "urgent","immediately","verify","suspended","suspend","winner","claim","congratulations","act now",
+  "limited time","click here","confirm","password","bank","account","prize","won","free","guarantee",
+  "credit","offer","cash","txt","text back","call now","expire","expires","security alert","unauthorized","locked",
+];
+
+const URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/gi;
+const WORD_RE = /[a-z']+/gi;
+const HANDCRAFTED_KEYS = [
+  "length", "wordCount", "urlCount", "exclamationCount", "digitRatio", "upperRatio", "currencyCount", "urgencyKeywordCount",
+] as const;
+
+function tokenize(text: string): string[] {
+  return (text.toLowerCase().match(WORD_RE) ?? []).filter((w) => w.length > 1);
+}
+
+function handcraftedFeatures(text: string): Record<(typeof HANDCRAFTED_KEYS)[number], number> {
+  const lower = text.toLowerCase();
+  const words = tokenize(text);
+  const len = text.length || 1;
+  const digits = (text.match(/[0-9]/g) ?? []).length;
+  const upper = (text.match(/[A-Z]/g) ?? []).length;
+  const urgencyKeywordCount = URGENCY_KEYWORDS.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
+
+  return {
+    length: Math.log(text.length + 1),
+    wordCount: words.length,
+    urlCount: (text.match(URL_RE) ?? []).length,
+    exclamationCount: (text.match(/!/g) ?? []).length,
+    digitRatio: digits / len,
+    upperRatio: upper / len,
+    currencyCount: (
+      text.match(/[$£€₹]|\b(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b/gi) ?? []
+    ).length,
+    urgencyKeywordCount,
+  };
+}
+
+function sigmoid(z: number) {
+  return 1 / (1 + Math.exp(-z));
+}
+
+/** Spam/scam-likelihood probability in [0, 1]. Cheap, deterministic, no network call. */
+function scoreMessage(text: string): number {
+  const hc = handcraftedFeatures(text);
+  const handcrafted = HANDCRAFTED_KEYS.map((k) => hc[k]);
+  const words = new Set(tokenize(text));
+  const bow = ML_WEIGHTS.vocab.map((w) => (words.has(w) ? 1 : 0));
+  const raw = [...handcrafted, ...bow];
+  const standardized = raw.map((v, j) => (v - ML_WEIGHTS.mean[j]) / (ML_WEIGHTS.std[j] || 1));
+  const z = standardized.reduce((acc, v, j) => acc + v * ML_WEIGHTS.weights[j], ML_WEIGHTS.bias);
+  return sigmoid(z);
+}
+
+// ---------------------------------------------------------------------------
+// Regex evidence layers — vendored from lib/socialEngineering.ts + lib/scamEnsemble.ts.
+// ---------------------------------------------------------------------------
+const PAYMENT_REQUEST_RE =
+  /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend)\b.{0,45}(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|crypto|bitcoin|btc|usdt|gift cards?)\b)/i;
+const REVERSED_PAYMENT_REQUEST_RE =
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|crypto|bitcoin|btc|usdt|gift cards?)\b).{0,45}\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend)\b/i;
+const IDENTITY_CLAIM_RE =
+  /\b(?:i\s*(?:am|'?m)|this\s+is|it\s+is)\s+(?:really\s+|actually\s+)?(?:the\s+)?real\s+[a-z][a-z'-]*(?:\s+[a-z][a-z'-]*)+/i;
+const TRUST_CLAIM_RE =
+  /\b(?:i\s*(?:am|'?m)|im|this\s+is|it\s+is)\s+(?:really\s+|actually\s+)?(?:the\s+)?(?:real|official|verified)\s+[a-z][a-z'-]*(?:\s+[a-z][a-z'-]*){0,4}/i;
+const MONEY_OR_CODE_RE =
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
+const PAYMENT_VERB_RE =
+  /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward|connect|enter|submit)\b/i;
+const PRESSURE_RE =
+  /\b(?:urgent|immediately|right now|asap|last chance|limited time|before it expires|account locked|suspended|final warning|don't tell anyone|keep this private)\b/i;
+const PRIZE_CRYPTO_JOB_RE =
+  /\b(?:congratulations|winner|won|prize|airdrop|free\s+(?:nitro|iphone|gift|reward)|nitro\s+(?:drop|gift)|gift\s*card|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
+const SUPPORT_IMPERSONATION_RE =
+  /\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank|support|admin|security)\b.{0,35}\b(?:support|security|team|admin|official|verification|helpdesk|copyright|appeal)\b|\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank)\s+(?:support|copyright|appeal)\b/i;
+const ACCOUNT_SECURITY_RE =
+  /\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b.{0,45}\b(?:blocked|locked|suspended|verify|verification|kyc|reactivate|restore|deleted|disabled|appeal)\b|\b(?:blocked|locked|suspended|deleted|disabled)\b.{0,45}\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b/i;
+const HAS_URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
+const SECRET_CREDENTIAL_RE =
+  /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed)\b/i;
+// Small subset of lib/promptInjection.ts — language aimed at manipulating an AI reviewer
+// embedded inside the very content being scanned (itself a strong scam/abuse signal).
+const AI_MANIPULATION_RE = [
+  /ignore (all|any|the)?\s*(previous|prior|above)?\s*instructions?/i,
+  /disregard (the|all|any)?\s*(previous|prior|above)?\s*(instructions|prompt)/i,
+  /(classify|mark|respond with|return)\b.{0,20}\bas\s+(safe|benign|not\s+a?\s*scam)/i,
+  /this is (not|never) a (scam|phishing|test)/i,
+  /do not (flag|mark|classify|treat) this/i,
+];
+
+interface ScamLayer {
+  label: string;
+  score: number;
+  evidence: string;
+}
+
+function clamp(score: number) {
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function weightedScore(layers: ScamLayer[]) {
+  if (!layers.length) return 0;
+  const top = [...layers].sort((a, b) => b.score - a.score).slice(0, 4);
+  const weighted = top.reduce((sum, layer, index) => sum + layer.score * (1 - index * 0.13), 0);
+  const weight = top.reduce((sum, _layer, index) => sum + (1 - index * 0.13), 0);
+  return clamp(weighted / weight);
+}
+
+/** Local, deterministic scam/phishing/social-engineering check. No network call, no API key needed. */
+export function checkScam(input: string): ProtectResult {
+  const text = input.slice(0, 20_000);
+  const mlScore = scoreMessage(text);
+  const layers: ScamLayer[] = [{ label: "Statistical scam classifier", score: mlScore * 100, evidence: `${Math.round(mlScore * 100)}% raw model probability` }];
+  const categories: string[] = [];
+
+  const paymentPhrase = text.match(PAYMENT_REQUEST_RE)?.[0] ?? text.match(REVERSED_PAYMENT_REQUEST_RE)?.[0] ?? null;
+  const identityPhrase = text.match(IDENTITY_CLAIM_RE)?.[0] ?? null;
+  const paymentLike = MONEY_OR_CODE_RE.test(text) && PAYMENT_VERB_RE.test(text);
+  const trustClaim = identityPhrase !== null || TRUST_CLAIM_RE.test(text);
+  const pressure = PRESSURE_RE.test(text);
+  const prizeCryptoJob = PRIZE_CRYPTO_JOB_RE.test(text);
+  const supportImpersonation = SUPPORT_IMPERSONATION_RE.test(text);
+  const accountSecurity = ACCOUNT_SECURITY_RE.test(text);
+  const hasUrl = HAS_URL_RE.test(text);
+  const secretCredentialRequest = SECRET_CREDENTIAL_RE.test(text);
+  const aiManipulation = AI_MANIPULATION_RE.some((re) => re.test(text));
+
+  if (paymentLike) {
+    layers.push({ label: "Payment or secret-code intent", score: 82, evidence: paymentPhrase ?? "money/code request" });
+    categories.push("payment-request");
+  }
+  if (trustClaim) {
+    layers.push({ label: "Unverified trust claim", score: paymentLike ? 96 : 66, evidence: identityPhrase ?? "real/official identity claim" });
+    categories.push("impersonation");
+  }
+  if (pressure) {
+    layers.push({ label: "Behavioral pressure", score: 68, evidence: text.match(PRESSURE_RE)?.[0] ?? "urgent language" });
+    categories.push("urgency-pressure");
+  }
+  if (prizeCryptoJob) {
+    layers.push({ label: "Common scam storyline", score: 64, evidence: text.match(PRIZE_CRYPTO_JOB_RE)?.[0] ?? "prize/crypto/job promise" });
+    categories.push("prize-crypto-job-lure");
+  }
+  if (supportImpersonation) {
+    layers.push({ label: "Platform/support impersonation", score: paymentLike || pressure ? 92 : 70, evidence: text.match(SUPPORT_IMPERSONATION_RE)?.[0] ?? "platform/support identity claim" });
+    categories.push("support-impersonation");
+  }
+  if (accountSecurity) {
+    layers.push({ label: "Account/KYC takeover lure", score: hasUrl ? 94 : 74, evidence: text.match(ACCOUNT_SECURITY_RE)?.[0] ?? "account security warning" });
+    categories.push("account-security-threat");
+  }
+  if (aiManipulation) {
+    layers.push({ label: "AI manipulation language", score: 78, evidence: "language aimed at manipulating an automated reviewer" });
+    categories.push("ai-manipulation-language");
+  }
+
+  const score = weightedScore(layers);
+  const hardScam =
+    (paymentLike && trustClaim) ||
+    (paymentLike && supportImpersonation) ||
+    (paymentLike && prizeCryptoJob) ||
+    (paymentLike && secretCredentialRequest) ||
+    (prizeCryptoJob && hasUrl) ||
+    (accountSecurity && hasUrl);
+
+  const verdict: ProtectResult["verdict"] = hardScam || score >= 72 ? "dangerous" : score >= 38 || paymentLike ? "suspicious" : "safe";
+
+  const reasons = layers
+    .filter((layer) => layer.label !== "Statistical scam classifier" || layers.length === 1)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((layer) => `${layer.label}: ${layer.evidence}`);
+
+  const recommendedAction =
+    verdict === "dangerous"
+      ? "Do not click, reply, pay, or share a code. Verify the request through a channel you already trust."
+      : verdict === "suspicious"
+        ? "Pause and verify this through an official app, site, or known contact before acting on it."
+        : "No strong scam patterns found. Still avoid sharing passwords, OTPs, or payment details if asked later.";
+
+  return {
+    verdict,
+    score,
+    mode: "scam",
+    reasons: reasons.length ? reasons : ["No notable scam signals were found."],
+    categories,
+    recommendedAction,
+    raw: { mlScore, layers, hardScam },
+  };
+}
