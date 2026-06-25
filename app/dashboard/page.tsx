@@ -80,7 +80,7 @@ type ProtectionMode = "scam" | "agent";
 interface ScanResultDoc {
   _id: string;
   _creationTime: number;
-  provider: "gmail" | "github" | "manual";
+  provider: "gmail" | "github" | "outlook" | "slack" | "manual";
   subject?: string;
   snippet: string;
   verdict: Verdict;
@@ -141,6 +141,8 @@ const SOURCE_LABELS: Record<ScanResultDoc["provider"], string> = {
   manual: "Manual",
   gmail: "Google",
   github: "GitHub",
+  outlook: "Outlook",
+  slack: "Slack",
 };
 
 const HISTORY_OPEN_KEY = "gf_history_open";
@@ -484,18 +486,18 @@ const CONNECTION_LANES = [
     label: "Outlook",
     sub: "Microsoft mail",
     icon: Mail,
-    status: "Next",
+    status: "Live",
     tone: "info",
-    detail: "Planned OAuth lane for work and school inboxes.",
+    detail: "Scan Microsoft inbox messages for phishing, KYC scams, fake invoices, and agent-injection text.",
   },
   {
     id: "slack",
     label: "Slack",
     sub: "Workspace DMs",
     icon: MessagesSquare,
-    status: "Next",
+    status: "Live",
     tone: "violet",
-    detail: "Designed for suspicious DMs, invite links, and fake admin requests.",
+    detail: "Scan workspace messages, invite links, fake admin requests, and suspicious tool-output pasted by teammates.",
   },
   {
     id: "whatsapp",
@@ -999,6 +1001,8 @@ export default function GhostFilterDashboard() {
   const scanInbox = useAction(api.gmail.scanInbox);
   const scanDrive = useAction(api.drive.scanDrive);
   const scanGithub = useAction(api.github.scanNotifications);
+  const scanOutlook = useAction(api.outlook.scanInbox);
+  const scanSlack = useAction(api.slack.scanWorkspace);
   const disconnect = useMutation(api.connections.disconnect);
   const removeScan = useMutation(api.scanResults.remove);
   const clearScans = useMutation(api.scanResults.clearForOwner);
@@ -1010,7 +1014,7 @@ export default function GhostFilterDashboard() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [agentResult, setAgentResult] = useState<AgentFirewallResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [scanningKind, setScanningKind] = useState<"inbox" | "drive" | "github" | null>(null);
+  const [scanningKind, setScanningKind] = useState<"inbox" | "drive" | "github" | "outlook" | "slack" | null>(null);
   const [scanDepth, setScanDepth] = useState(25);
   const [scanError, setScanError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -1033,6 +1037,8 @@ export default function GhostFilterDashboard() {
 
   const gmailConnection = connections?.find((c) => c.provider === "gmail" && c.status === "connected");
   const githubConnection = connections?.find((c) => c.provider === "github" && c.status === "connected");
+  const outlookConnection = connections?.find((c) => c.provider === "outlook" && c.status === "connected");
+  const slackConnection = connections?.find((c) => c.provider === "slack" && c.status === "connected");
   const selected =
     protectionMode === "scam"
       ? selectedId
@@ -1063,6 +1069,8 @@ export default function GhostFilterDashboard() {
     manual: scans?.filter((scan) => scan.provider === "manual").length ?? 0,
     gmail: scans?.filter((scan) => scan.provider === "gmail").length ?? 0,
     github: scans?.filter((scan) => scan.provider === "github").length ?? 0,
+    outlook: scans?.filter((scan) => scan.provider === "outlook").length ?? 0,
+    slack: scans?.filter((scan) => scan.provider === "slack").length ?? 0,
   };
   const threatCount = scanCounts.scam + scanCounts.suspicious;
   const threatRate = scanCounts.all ? Math.round((threatCount / scanCounts.all) * 100) : 0;
@@ -1260,14 +1268,16 @@ export default function GhostFilterDashboard() {
     setScanSort("newest");
   };
 
-  const runScan = async (kind: "inbox" | "drive" | "github") => {
+  const runScan = async (kind: "inbox" | "drive" | "github" | "outlook" | "slack") => {
     if (!ownerId || scanningKind) return;
     setScanningKind(kind);
     setScanError(null);
     try {
       if (kind === "inbox") await scanInbox({ ownerId, limit: scanDepth });
       else if (kind === "drive") await scanDrive({ ownerId, limit: scanDepth });
-      else await scanGithub({ ownerId, limit: scanDepth });
+      else if (kind === "github") await scanGithub({ ownerId, limit: scanDepth });
+      else if (kind === "outlook") await scanOutlook({ ownerId, limit: scanDepth });
+      else await scanSlack({ ownerId, limit: scanDepth });
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Scan failed");
     } finally {
@@ -1540,7 +1550,7 @@ export default function GhostFilterDashboard() {
                       ))}
                     </div>
                     <div className="mt-2 flex gap-1 overflow-x-auto pb-0.5" role="group" aria-label="Filter scans by source">
-                      {(["all", "manual", "gmail", "github"] as const).map((source) => (
+                      {(["all", "manual", "gmail", "outlook", "slack", "github"] as const).map((source) => (
                         <button
                           key={source}
                           onClick={() => setSourceFilter(source)}
@@ -1858,6 +1868,56 @@ export default function GhostFilterDashboard() {
                           </div>
                         ) : (
                           ownerId && <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect" sub="OAuth" />
+                        )
+                      }
+                    />
+                  );
+                }
+                if (lane.id === "outlook") {
+                  return (
+                    <LaneCard
+                      key={lane.id}
+                      lane={lane}
+                      active={!!outlookConnection}
+                      action={
+                        outlookConnection ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            <ScanButton label="Inbox" busy={scanningKind === "outlook"} disabled={!!scanningKind} onClick={() => runScan("outlook")} />
+                            <button
+                              onClick={() => handleDisconnect(outlookConnection._id, "Outlook")}
+                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                            >
+                              <Unlink className="h-3 w-3" />
+                              Off
+                            </button>
+                          </div>
+                        ) : (
+                          ownerId && <ConnectButton href={`/api/auth/outlook?ownerId=${ownerId}`} icon={Mail} label="Connect" sub="OAuth" />
+                        )
+                      }
+                    />
+                  );
+                }
+                if (lane.id === "slack") {
+                  return (
+                    <LaneCard
+                      key={lane.id}
+                      lane={lane}
+                      active={!!slackConnection}
+                      action={
+                        slackConnection ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            <ScanButton label="Scan" busy={scanningKind === "slack"} disabled={!!scanningKind} onClick={() => runScan("slack")} />
+                            <button
+                              onClick={() => handleDisconnect(slackConnection._id, "Slack")}
+                              className="flex items-center gap-1 rounded border border-[var(--line-strong)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-500 hover:border-[#ef4060] hover:text-[#ef4060]"
+                            >
+                              <Unlink className="h-3 w-3" />
+                              Off
+                            </button>
+                          </div>
+                        ) : (
+                          ownerId && <ConnectButton href={`/api/auth/slack?ownerId=${ownerId}`} icon={MessagesSquare} label="Connect" sub="OAuth" />
                         )
                       }
                     />

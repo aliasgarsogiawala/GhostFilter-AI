@@ -5,7 +5,7 @@ export const insert = internalMutation({
   args: {
     ownerId: v.string(),
     connectionId: v.optional(v.id("connections")),
-    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("manual")),
+    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("outlook"), v.literal("slack"), v.literal("manual")),
     externalId: v.optional(v.string()),
     subject: v.optional(v.string()),
     snippet: v.string(),

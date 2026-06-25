@@ -2,17 +2,17 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // One row per account a browser has connected (Gmail now; other providers
-  // render as "Coming Soon" in the UI until they get a real OAuth callback).
+  // One row per account a browser has connected. Tokens are stripped from the
+  // public list query and only used by server-side scan actions.
   connections: defineTable({
     ownerId: v.string(), // anonymous client id, stored in a cookie — no full auth system
-    provider: v.union(v.literal("gmail"), v.literal("github")),
+    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("outlook"), v.literal("slack")),
     status: v.union(v.literal("connected"), v.literal("disconnected")),
     accessToken: v.string(),
     refreshToken: v.optional(v.string()),
     expiresAt: v.optional(v.number()),
     accountEmail: v.optional(v.string()),
-    accountName: v.optional(v.string()), // e.g. GitHub @handle
+    accountName: v.optional(v.string()), // e.g. GitHub @handle, Slack workspace/team, Microsoft display name
     lastScannedAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
@@ -23,7 +23,7 @@ export default defineSchema({
   scanResults: defineTable({
     ownerId: v.string(),
     connectionId: v.optional(v.id("connections")),
-    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("manual")),
+    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("outlook"), v.literal("slack"), v.literal("manual")),
     externalId: v.optional(v.string()), // e.g. Gmail message id, for de-duplication
     subject: v.optional(v.string()),
     snippet: v.string(),

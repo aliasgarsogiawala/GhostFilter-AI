@@ -69,6 +69,77 @@ export const upsertGithub = mutation({
   },
 });
 
+export const upsertOutlook = mutation({
+  args: {
+    ownerId: v.string(),
+    accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    accountEmail: v.optional(v.string()),
+    accountName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("connections")
+      .withIndex("by_owner_provider", (q) => q.eq("ownerId", args.ownerId).eq("provider", "outlook"))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: "connected",
+        accessToken: args.accessToken,
+        refreshToken: args.refreshToken ?? existing.refreshToken,
+        expiresAt: args.expiresAt,
+        accountEmail: args.accountEmail ?? existing.accountEmail,
+        accountName: args.accountName ?? existing.accountName,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("connections", {
+      ownerId: args.ownerId,
+      provider: "outlook",
+      status: "connected",
+      accessToken: args.accessToken,
+      refreshToken: args.refreshToken,
+      expiresAt: args.expiresAt,
+      accountEmail: args.accountEmail,
+      accountName: args.accountName,
+    });
+  },
+});
+
+export const upsertSlack = mutation({
+  args: {
+    ownerId: v.string(),
+    accessToken: v.string(),
+    accountName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("connections")
+      .withIndex("by_owner_provider", (q) => q.eq("ownerId", args.ownerId).eq("provider", "slack"))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: "connected",
+        accessToken: args.accessToken,
+        accountName: args.accountName ?? existing.accountName,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("connections", {
+      ownerId: args.ownerId,
+      provider: "slack",
+      status: "connected",
+      accessToken: args.accessToken,
+      accountName: args.accountName,
+    });
+  },
+});
+
 // Public list — strips tokens before returning, never expose them to the client.
 export const listForOwner = query({
   args: { ownerId: v.string() },
@@ -112,6 +183,28 @@ export const getActiveGithub = internalQuery({
     const row = await ctx.db
       .query("connections")
       .withIndex("by_owner_provider", (q) => q.eq("ownerId", ownerId).eq("provider", "github"))
+      .first();
+    return row && row.status === "connected" ? row : null;
+  },
+});
+
+export const getActiveOutlook = internalQuery({
+  args: { ownerId: v.string() },
+  handler: async (ctx, { ownerId }) => {
+    const row = await ctx.db
+      .query("connections")
+      .withIndex("by_owner_provider", (q) => q.eq("ownerId", ownerId).eq("provider", "outlook"))
+      .first();
+    return row && row.status === "connected" ? row : null;
+  },
+});
+
+export const getActiveSlack = internalQuery({
+  args: { ownerId: v.string() },
+  handler: async (ctx, { ownerId }) => {
+    const row = await ctx.db
+      .query("connections")
+      .withIndex("by_owner_provider", (q) => q.eq("ownerId", ownerId).eq("provider", "slack"))
       .first();
     return row && row.status === "connected" ? row : null;
   },

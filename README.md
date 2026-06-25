@@ -123,6 +123,8 @@ are caught by the payment-intent + unverified-identity layers even if the statis
 | Manual message scanner | Live | Paste SMS, chat messages, emails, or links. |
 | File scanner | Live | Reads screenshots/images, PDFs, `.eml`, and text files for scam analysis. |
 | Gmail | Live | Read-only OAuth scan of recent inbox messages. |
+| Outlook | Live when Microsoft OAuth is configured | Read-only OAuth scan of recent Microsoft inbox messages. |
+| Slack | Live when Slack OAuth is configured | Read-only workspace scan of recent channel/DM text the app is allowed to access. |
 | Google Drive | Live | Read-only scan of recent Drive files/metadata. |
 | GitHub | Live | Read-only scan of notification-style security/social-engineering messages. |
 | VirusTotal | Live when key is set | Checks domain reputation for links. |
@@ -198,6 +200,7 @@ Safe result for human OR safe context for GhostGPT
 - GhostGPT firewall API endpoint.
 - Judge demo page: `/demo`.
 - Batch evaluation page: `/eval`.
+- Browser extension starter in `browser-extension/`.
 - Message, email, link, and file scan modes.
 - Channel-specific scam templates for SMS, WhatsApp, Instagram DM, Telegram, and Discord.
 - 3D risk card and tactile UI surfaces.
@@ -232,12 +235,16 @@ app/
   profile/page.tsx             History/analytics view
   api/auth/google/             Google OAuth routes
   api/auth/github/             GitHub OAuth routes
+  api/auth/outlook/            Microsoft Outlook OAuth routes
+  api/auth/slack/              Slack OAuth routes
   api/ghostgpt/firewall/       Agent firewall API route
 
 convex/
   pipeline.ts                  Shared scam/phishing analysis pipeline
   agentScans.ts                GhostGPT firewall history
   gmail.ts                     Gmail scanner
+  outlook.ts                   Outlook scanner
+  slack.ts                     Slack workspace scanner
   drive.ts                     Google Drive scanner
   github.ts                    GitHub notification scanner
   scanResults.ts               Scan storage, feedback, deletion
@@ -255,6 +262,10 @@ lib/
   fileExtraction.ts            Image/PDF text extraction
   virustotal.ts                Domain reputation
   urlscan.ts                   Sandboxed page preview
+
+browser-extension/
+  manifest.json                Loadable Chrome/Edge extension starter
+  popup.js                     Scans selected page text via GhostGPT firewall API
 
 scripts/
   train-classifier.ts          Offline classifier training
@@ -305,6 +316,10 @@ Create `.env.local`.
 | `GOOGLE_CLIENT_SECRET` | For Gmail/Drive | Google OAuth secret. Also set in Convex. |
 | `GITHUB_CLIENT_ID` | For GitHub | GitHub OAuth client ID. |
 | `GITHUB_CLIENT_SECRET` | For GitHub | GitHub OAuth secret. |
+| `MICROSOFT_CLIENT_ID` | For Outlook | Microsoft app client ID. |
+| `MICROSOFT_CLIENT_SECRET` | For Outlook | Microsoft app secret. |
+| `SLACK_CLIENT_ID` | For Slack | Slack app client ID. |
+| `SLACK_CLIENT_SECRET` | For Slack | Slack app secret. |
 | `VIRUSTOTAL_API_KEY` | Optional | Domain reputation checks. Set in Convex for actions. |
 | `URLSCAN_API_KEY` | Optional | Sandboxed link previews. Set in Convex for actions. |
 
@@ -329,6 +344,18 @@ GitHub OAuth callback URL for local development:
 
 ```text
 http://localhost:3000/api/auth/github/callback
+```
+
+Microsoft OAuth redirect URI for local development:
+
+```text
+http://localhost:3000/api/auth/outlook/callback
+```
+
+Slack OAuth redirect URI for local development:
+
+```text
+http://localhost:3000/api/auth/slack/callback
 ```
 
 ## Retrain the classifier

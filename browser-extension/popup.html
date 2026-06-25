@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GhostFilter Guard</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="mark">GF</div>
+        <div>
+          <h1>GhostFilter Guard</h1>
+          <p>Scan selected text before GhostGPT reads it.</p>
+        </div>
+      </header>
+
+      <label>
+        API base URL
+        <input id="apiBase" value="http://localhost:3000" />
+      </label>
+
+      <button id="scan">Scan selected text</button>
+
+      <section id="result" hidden>
+        <div class="verdict">
+          <span id="verdictDot"></span>
+          <strong id="title"></strong>
+        </div>
+        <p id="summary"></p>
+        <textarea id="safeContext" readonly></textarea>
+        <button id="copy">Copy safe context</button>
+      </section>
+
+      <p id="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
