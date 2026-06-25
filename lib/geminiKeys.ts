@@ -3,9 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 const GEMINI_KEY_NAMES = [
   "GEMINI_API_KEY_1",
   "GEMINI_API_KEY_2",
-  "GEMINI_API_KEY_3",
-  "GEMINI_API_KEY_4",
-  "GEMINI_API_KEY",
 ] as const;
 
 interface GeminiKeyEntry {
@@ -35,7 +32,7 @@ export function getGeminiClientForKey(entry: GeminiKeyEntry) {
 }
 
 export function geminiKeyHelpText() {
-  return "Set at least one Gemini key: GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3, GEMINI_API_KEY_4, or legacy GEMINI_API_KEY.";
+  return "Set at least one Gemini key: GEMINI_API_KEY_1 or GEMINI_API_KEY_2.";
 }
 
 export function isGeminiTransientOrQuotaError(err: unknown) {
