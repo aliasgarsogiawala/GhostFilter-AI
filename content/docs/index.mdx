@@ -1,0 +1,36 @@
+---
+title: GhostFilter Docs
+description: Build with GhostFilter AI, Ghosti Guard, and the published ghostfilter-ai npm package.
+---
+
+GhostFilter AI is a safety firewall for humans and AI agents.
+
+It protects against two connected problems:
+
+- scams, phishing, impersonation, unsafe links, and risky files for people
+- prompt injection, jailbreaks, secret extraction, and unsafe tool-use instructions for GhostGPT and other AI agents
+
+The reusable developer SDK is published on npm:
+
+```bash
+npm install ghostfilter-ai
+```
+
+[Open the npm package](https://www.npmjs.com/package/ghostfilter-ai)
+
+## What you can build
+
+- Add scam/phishing checks to your app
+- Add prompt-injection checks before an AI agent reads external content
+- Wrap untrusted content in safe GhostGPT context
+- Guard explicit shell commands in CLIs or developer tools
+- Use the browser extension to scan selected webpage text or whole pages
+
+## Main surfaces
+
+| Surface | What it does |
+| --- | --- |
+| Web app | Human-friendly scanner, GhostGPT firewall, history, eval, and demo pages |
+| `ghostfilter-ai` npm package | Local-first TypeScript SDK and CLI |
+| Ghosti Guard extension | Browser popup for selected text / whole-page agent-safety checks |
+| `/api/ghostgpt/firewall` | Agent firewall endpoint for deployed app integrations |

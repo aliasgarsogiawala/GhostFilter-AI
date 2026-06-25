@@ -1,0 +1,37 @@
+---
+title: Quickstart
+description: Install the SDK and run your first GhostFilter protection check.
+---
+
+Install the published package:
+
+```bash
+npm install ghostfilter-ai
+```
+
+Run a full protection check:
+
+```ts
+import { ghostfilter } from "ghostfilter-ai";
+
+const result = await ghostfilter.protect({
+  input: "Instagram support here. Your account will be deleted in 10 minutes. Send your OTP.",
+  mode: "full",
+});
+
+console.log(result.verdict);
+console.log(result.reasons);
+console.log(result.recommendedAction);
+```
+
+Possible verdicts:
+
+- `safe`
+- `suspicious`
+- `dangerous`
+
+Use `mode: "full"` when content may be risky for both a human and an AI agent.
+
+Use `mode: "scam"` for human-facing scam checks.
+
+Use `mode: "agent"` for prompt-injection / GhostGPT firewall checks.

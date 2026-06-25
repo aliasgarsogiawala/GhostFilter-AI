@@ -1,0 +1,4 @@
+{
+  "title": "GhostFilter Docs",
+  "pages": ["index", "quickstart", "sdk", "cli", "browser-extension", "agent-firewall"]
+}

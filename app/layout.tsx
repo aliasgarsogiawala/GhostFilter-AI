@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { RootProvider } from "fumadocs-ui/provider/next";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
 
@@ -33,7 +34,9 @@ export default function RootLayout({
       className={`${displaySans.variable} ${dataMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <RootProvider theme={{ attribute: "class", forcedTheme: "dark" }}>
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </RootProvider>
       </body>
     </html>
   );

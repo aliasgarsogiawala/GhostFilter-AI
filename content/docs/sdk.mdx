@@ -1,0 +1,52 @@
+---
+title: SDK API
+description: The public ghostfilter-ai SDK functions and result shape.
+---
+
+The SDK is local-first. It works without API keys and without a network call.
+
+```ts
+import { ghostfilter } from "ghostfilter-ai";
+```
+
+## Functions
+
+```ts
+ghostfilter.protect({ input, mode });
+ghostfilter.checkScam(input);
+ghostfilter.checkAgentInjection(input);
+ghostfilter.sanitizeForAgent(input);
+ghostfilter.checkCommand(input);
+```
+
+## Modes
+
+```ts
+type ProtectMode = "scam" | "agent" | "full";
+```
+
+## Result shape
+
+```ts
+type ProtectResult = {
+  verdict: "safe" | "suspicious" | "dangerous";
+  score: number;
+  mode: "scam" | "agent" | "full" | "command";
+  reasons: string[];
+  categories: string[];
+  safeContext?: string;
+  recommendedAction: string;
+  raw?: unknown;
+};
+```
+
+## Optional deployed API mode
+
+For agent checks, the SDK can call your deployed GhostFilter app:
+
+```bash
+GHOSTFILTER_API_URL=https://your-ghostfilter-app.example.com
+GHOSTFILTER_API_KEY=optional-bearer-token
+```
+
+If the API is missing or unavailable, the SDK falls back to local checks.

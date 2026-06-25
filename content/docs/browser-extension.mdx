@@ -1,0 +1,45 @@
+---
+title: Browser Extension
+description: Test and ship the Ghosti Guard browser extension for judges.
+---
+
+Ghosti Guard is the browser extension in `browser-extension/`.
+
+It scans:
+
+- selected webpage text
+- whole visible pages
+- suspicious DMs copied into web apps
+- tool output before sending it to GhostGPT
+
+## Local test
+
+Start GhostFilter:
+
+```bash
+npm run dev
+```
+
+Open Chrome:
+
+```text
+chrome://extensions
+```
+
+Then:
+
+1. Enable Developer Mode.
+2. Click **Load unpacked**.
+3. Select the `browser-extension` folder.
+4. Keep API base URL as `http://localhost:3000`.
+5. Scan selected text or the whole page.
+
+## Judge release
+
+The repository includes:
+
+```text
+ghosti-guard-extension.zip
+```
+
+Judges can unzip it and load the folder as an unpacked Chrome extension.

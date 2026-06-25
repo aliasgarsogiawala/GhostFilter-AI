@@ -201,6 +201,7 @@ Safe result for human OR safe context for GhostGPT
 - Ghosti safety assistant for explanations, next steps, safe replies, and GhostGPT handoff advice.
 - Judge demo page: `/demo`.
 - Batch evaluation page: `/eval`.
+- Fumadocs-powered developer docs: `/docs`.
 - Polished Ghosti Guard browser extension in `browser-extension/`.
 - Message, email, link, and file scan modes.
 - Channel-specific scam templates for SMS, WhatsApp, Instagram DM, Telegram, and Discord.
@@ -378,8 +379,10 @@ Only the trained weights are committed. The raw corpus is re-downloadable and ig
 
 ## Developer SDK: `ghostfilter-ai`
 
-The same detection engine is also published as a standalone npm package in
-[`packages/ghostfilter-ai`](packages/ghostfilter-ai), for developers who want to add
+The same detection engine is published as a standalone npm package:
+[ghostfilter-ai on npm](https://www.npmjs.com/package/ghostfilter-ai).
+
+The package source also lives in [`packages/ghostfilter-ai`](packages/ghostfilter-ai), for developers who want to add
 GhostFilter protection to their own apps, CLIs, or AI agents without running this whole
 project. It covers both threat classes above — scams/phishing aimed at people and
 prompt-injection/unsafe tool-use instructions aimed at AI agents — and runs fully locally
@@ -399,7 +402,7 @@ It also ships a `ghostfilter` CLI (`ghostfilter scan`, `ghostfilter pipe`, `ghos
 and can optionally call this app's `/api/ghostgpt/firewall` endpoint instead of running
 locally when `GHOSTFILTER_API_URL` is set. See
 [`packages/ghostfilter-ai/README.md`](packages/ghostfilter-ai/README.md) for the full API,
-CLI usage, and result shape.
+CLI usage, and result shape. The web app also includes Fumadocs-powered docs at `/docs`.
 
 ## Privacy and safety
 

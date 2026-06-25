@@ -11,8 +11,12 @@
   },
   "dependencies": {
     "@google/genai": "^2.9.0",
+    "@types/mdx": "^2.0.14",
     "convex": "^1.41.0",
     "framer-motion": "^12.40.0",
+    "fumadocs-core": "^16.10.5",
+    "fumadocs-mdx": "^15.0.12",
+    "fumadocs-ui": "^16.10.5",
     "googleapis": "^173.0.0",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",

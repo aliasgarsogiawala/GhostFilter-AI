@@ -18,6 +18,7 @@ import {
   MessageSquareText,
   MessagesSquare,
   Moon,
+  Package,
   ScanLine,
   ShieldCheck,
   ShieldX,
@@ -126,6 +127,17 @@ const LANDING_CONNECTIONS = [
   { icon: MessageSquareText, label: "WhatsApp", status: "Paste" },
   { icon: Upload, label: "PDF / Image", status: "Live" },
 ] as const;
+
+const SDK_SNIPPET = `import { ghostfilter } from "ghostfilter-ai";
+
+const result = await ghostfilter.protect({
+  input: untrustedContent,
+  mode: "full",
+});
+
+if (result.verdict !== "safe") {
+  console.log(result.reasons);
+}`;
 
 function BrandMark({ splash = false }: { splash?: boolean }) {
   return (
@@ -271,6 +283,12 @@ export default function LandingPage() {
             <Link href="/eval" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
               Eval
             </Link>
+            <Link href="/docs" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
+              Docs
+            </Link>
+            <a href="https://www.npmjs.com/package/ghostfilter-ai" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 lg:block">
+              npm
+            </a>
             <a href="#privacy" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
               Privacy
             </a>
@@ -313,16 +331,16 @@ export default function LandingPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
-                  href="#product"
+                  href="https://www.npmjs.com/package/ghostfilter-ai"
                   className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-5 text-[12px] font-medium text-zinc-300 hover:border-[var(--text-secondary)]"
                 >
-                  How it works
+                  npm package
                   <ChevronRight className="h-4 w-4" />
                 </a>
               </div>
 
               <div className="mt-8 grid max-w-lg gap-2 sm:grid-cols-3">
-                {["Scam shield", "GhostGPT firewall", "Safe context handoff"].map((item) => (
+                {["Scam shield", "GhostGPT firewall", "npm SDK"].map((item) => (
                   <span key={item} className="landing-mini-card flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[10px] text-zinc-500">
                     <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
                     {item}
@@ -389,6 +407,50 @@ export default function LandingPage() {
                   <p className="mt-2 text-[11px] leading-6 text-zinc-500">{copy}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b border-[var(--line)] bg-[var(--panel)]">
+          <div className="mx-auto grid max-w-6xl gap-8 px-5 py-14 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:px-8">
+            <div>
+              <p className="flex items-center gap-2 text-[11px] font-medium text-[var(--accent)]">
+                <Package className="h-4 w-4" />
+                Published developer SDK
+              </p>
+              <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-[-0.035em] text-zinc-100">
+                Add GhostFilter protection to any app or AI agent with npm.
+              </h2>
+              <p className="mt-4 max-w-md text-[13px] leading-6 text-zinc-500">
+                The <span className="font-mono text-zinc-300">ghostfilter-ai</span> package is live on npm with local-first scam detection, GhostGPT prompt-injection checks, safe context wrappers, and a CLI.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href="https://www.npmjs.com/package/ghostfilter-ai"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-5 text-[12px] font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-bright)]"
+                >
+                  View on npm
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+                <Link
+                  href="/docs"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-5 text-[12px] font-medium text-zinc-300 hover:border-[var(--text-secondary)]"
+                >
+                  Read docs
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+            <div className="landing-tilt-card overflow-hidden rounded-xl border border-[var(--line-strong)] bg-[var(--input)]">
+              <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+                <span className="font-mono text-[11px] font-bold text-zinc-500">npm install ghostfilter-ai</span>
+                <span className="rounded-full border border-[var(--accent)] px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-[var(--accent)]">
+                  Published
+                </span>
+              </div>
+              <pre className="overflow-x-auto p-5 text-[11px] leading-6 text-zinc-400">
+                <code>{SDK_SNIPPET}</code>
+              </pre>
             </div>
           </div>
         </section>
