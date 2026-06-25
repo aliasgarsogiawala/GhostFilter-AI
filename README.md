@@ -119,6 +119,7 @@ are caught by the payment-intent + unverified-identity layers even if the statis
 | Safe context wrapper | Live | Rewrites untrusted content into a safe handoff format for GhostGPT. |
 | GhostGPT firewall history | Live | Saves pass/isolate/block decisions separately from scam history. |
 | GhostGPT API middleware | Live | `POST /api/ghostgpt/firewall` returns agent-safe verdicts and sanitized context. |
+| Ghosti safety assistant | Live | Explains results, suggests next steps, drafts safer verification text, and helps prepare safe GhostGPT context. |
 | Scam AI/ML ensemble | Live | Combines local ML, behavioral rules, link intel, email forensics, and AI review. |
 | Manual message scanner | Live | Paste SMS, chat messages, emails, or links. |
 | File scanner | Live | Reads screenshots/images, PDFs, `.eml`, and text files for scam analysis. |
@@ -197,9 +198,10 @@ Safe result for human OR safe context for GhostGPT
 - GhostGPT Firewall mode.
 - GhostGPT firewall history and pass/isolate/block review.
 - GhostGPT firewall API endpoint.
+- Ghosti safety assistant for explanations, next steps, safe replies, and GhostGPT handoff advice.
 - Judge demo page: `/demo`.
 - Batch evaluation page: `/eval`.
-- Browser extension starter in `browser-extension/`.
+- Polished Ghosti Guard browser extension in `browser-extension/`.
 - Message, email, link, and file scan modes.
 - Channel-specific scam templates for SMS, WhatsApp, Instagram DM, Telegram, and Discord.
 - 3D risk card and tactile UI surfaces.

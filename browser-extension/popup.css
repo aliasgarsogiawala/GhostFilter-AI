@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  width: 360px;
+  width: 390px;
   background: #090a12;
   color: #e8e8ee;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -10,22 +10,25 @@ main {
   padding: 16px;
 }
 
-header {
+.hero {
   display: flex;
   gap: 12px;
   align-items: center;
   margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #25283a;
 }
 
 .mark {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border: 1px solid #2de6bd;
   border-radius: 10px;
   color: #2de6bd;
   font-weight: 900;
+  box-shadow: 3px 3px 0 0 #132b27;
 }
 
 h1 {
@@ -48,6 +51,10 @@ label {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.field {
+  margin-bottom: 12px;
 }
 
 input,
@@ -78,7 +85,6 @@ textarea {
 button {
   width: 100%;
   min-height: 38px;
-  margin-top: 12px;
   border: 0;
   border-radius: 8px;
   background: #2de6bd;
@@ -93,10 +99,42 @@ button.secondary {
   color: #e8e8ee;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.hint {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #25283a;
+  border-radius: 10px;
+  background: #0d101b;
+}
+
 #result {
   margin-top: 14px;
-  border-top: 1px solid #25283a;
-  padding-top: 14px;
+}
+
+.verdict-card,
+.ghosti,
+details {
+  border: 1px solid #25283a;
+  border-radius: 12px;
+  background: #11131f;
+  padding: 12px;
+}
+
+.ghosti,
+details {
+  margin-top: 10px;
 }
 
 .verdict {
@@ -112,7 +150,43 @@ button.secondary {
   background: #2de6bd;
 }
 
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.meta span {
+  border: 1px solid #25283a;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #b7bac7;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ghosti-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e8e8ee;
+  font-size: 12px;
+}
+
+summary {
+  cursor: pointer;
+  color: #b7bac7;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 #status {
   min-height: 18px;
   color: #f7b84b;
+  overflow-wrap: anywhere;
 }

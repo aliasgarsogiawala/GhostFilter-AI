@@ -43,6 +43,11 @@ const BENEFITS = [
     title: "Safe context handoff",
     copy: "Generate a sanitized wrapper so GhostGPT treats external content as untrusted data, not instructions.",
   },
+  {
+    icon: Bot,
+    title: "Ghosti safety assistant",
+    copy: "Ghosti explains each result in normal language, suggests the next safe move, and helps turn risky content into safer GhostGPT context.",
+  },
 ] as const;
 
 const AI_LAYERS = [
@@ -73,6 +78,11 @@ const FAQS = [
     question: "How does GhostFilter protect GhostGPT?",
     answer:
       "GhostFilter scans untrusted content before it reaches GhostGPT. If it finds prompt injection, secret extraction, jailbreak, or tool-abuse attempts, it recommends pass, isolate, or block, saves the firewall run, and can generate a safe context wrapper.",
+  },
+  {
+    question: "Who is Ghosti?",
+    answer:
+      "Ghosti is the built-in safety assistant. It explains why something was flagged, gives the safest next step, helps draft a safer verification reply, and explains how to pass content to GhostGPT safely.",
   },
   {
     question: "Where is the AI/ML part?",
@@ -111,7 +121,7 @@ const LANDING_CONNECTIONS = [
   { icon: FileCheck2, label: "Drive", status: "Live" },
   { icon: Code2, label: "GitHub", status: "Live" },
   { icon: Mail, label: "Outlook", status: "Next" },
-  { icon: MessagesSquare, label: "Slack", status: "Next" },
+  { icon: MessagesSquare, label: "Slack", status: "Live" },
   { icon: Smartphone, label: "SMS", status: "Paste" },
   { icon: MessageSquareText, label: "WhatsApp", status: "Paste" },
   { icon: Upload, label: "PDF / Image", status: "Live" },

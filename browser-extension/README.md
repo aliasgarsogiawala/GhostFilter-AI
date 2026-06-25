@@ -1,15 +1,15 @@
-# GhostFilter Browser Extension Starter
+# Ghosti Guard Browser Extension
 
 This is a lightweight Chrome/Edge extension demo for hackathon judging.
 
-It scans selected webpage text through the local GhostFilter API:
+It scans selected text or the visible page through the local GhostFilter API:
 
 ```text
-Selected webpage / DM / tool output
+Selected webpage / full page / DM / tool output
         ↓
 POST /api/ghostgpt/firewall
         ↓
-pass / isolate / block + safe GhostGPT context
+pass / isolate / block + Ghosti advice + safe GhostGPT context
 ```
 
 ## Run locally
@@ -26,9 +26,18 @@ pass / isolate / block + safe GhostGPT context
    - Click **Load unpacked**
    - Select this `browser-extension` folder
 
-3. Highlight suspicious text on a webpage.
+3. Highlight suspicious text on a webpage, or open a page you want to scan.
 4. Click the GhostFilter extension.
-5. Click **Scan selected text**.
+5. Click **Scan selected text** or **Scan whole page**.
+
+## What the popup shows
+
+- Verdict: pass / isolate / block
+- Risk score
+- Ghosti's plain-English advice
+- Safe GhostGPT context wrapper
+- Copy safe context button
+- Open dashboard button
 
 ## Configure API URL
 

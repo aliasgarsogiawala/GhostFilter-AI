@@ -75,6 +75,7 @@ type SourceFilter = "all" | ScanResultDoc["provider"];
 type ScanSort = "newest" | "risk" | "confidence";
 type InputMode = "message" | "email" | "link" | "file";
 type ProtectionMode = "scam" | "agent";
+type GhostiMode = "explain" | "action" | "reply" | "agent";
 
 interface ScanResultDoc {
   _id: string;
@@ -374,6 +375,48 @@ function safetyActions(result: ScanResultDoc): { label: string; detail: string; 
 function verificationMessage(result: ScanResultDoc): string {
   const pattern = riskPattern(result).label.toLowerCase();
   return `Hey, I received a message that looks like a possible ${pattern}. I’m not going to use the link or reply there. Can you confirm through this trusted chat/number whether the request is real?`;
+}
+
+function ghostiAdvice({
+  mode,
+  protectionMode,
+  result,
+  agentResult,
+}: {
+  mode: GhostiMode;
+  protectionMode: ProtectionMode;
+  result: ScanResultDoc | null;
+  agentResult: AgentFirewallResult | null;
+}) {
+  if (protectionMode === "agent") {
+    if (!agentResult) {
+      return "Paste untrusted content and I’ll tell you whether GhostGPT should read it raw, read it only as isolated context, or avoid it completely.";
+    }
+    if (mode === "action") return agentResult.recommendation;
+    if (mode === "reply") {
+      return "For AI-agent inputs, don’t reply to the content. Copy the safe context wrapper and pass that to GhostGPT instead of the raw text.";
+    }
+    if (mode === "agent") {
+      return agentResult.verdict === "pass"
+        ? "GhostGPT can read this, but it should still treat it as external data."
+        : "Use the safe context wrapper. It tells GhostGPT which text is untrusted and blocks hidden instructions from becoming commands.";
+    }
+    return agentResult.findings.length
+      ? `I found ${agentResult.findings.length} agent-risk signal${agentResult.findings.length === 1 ? "" : "s"}, including ${agentResult.findings[0].label.toLowerCase()}.`
+      : "I did not find obvious prompt-injection language, but external content should still stay in a low-trust zone.";
+  }
+
+  if (!result) {
+    return "Paste a message, email, link, or file and I’ll explain the risk in normal language — no security degree required.";
+  }
+  if (mode === "action") return result.recommendation;
+  if (mode === "reply") return verificationMessage(result);
+  if (mode === "agent") {
+    return "If you want GhostGPT to process this message, switch to GhostGPT Firewall mode or wrap it as untrusted context first.";
+  }
+  const plain = plainEnglishResult(result);
+  const pattern = riskPattern(result);
+  return `${plain.title} Main pattern: ${pattern.label}. ${pattern.copy}`;
 }
 
 function agentVerdictTone(result: AgentFirewallResult | null): Tone {
@@ -991,6 +1034,7 @@ export default function GhostFilterDashboard() {
   const [agentHistoryOpen, setAgentHistoryOpen] = useState(true);
   const [scanSort, setScanSort] = useState<ScanSort>("newest");
   const [deepReviewOnly, setDeepReviewOnly] = useState(false);
+  const [ghostiMode, setGhostiMode] = useState<GhostiMode>("explain");
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
@@ -1384,6 +1428,12 @@ export default function GhostFilterDashboard() {
   const completedPlanCount = selected
     ? actionPlan.filter((_, index) => completedSafetyActions[`${selected._id}:${index}`]).length
     : 0;
+  const ghostiText = ghostiAdvice({
+    mode: ghostiMode,
+    protectionMode,
+    result: selected ?? null,
+    agentResult: activeAgentResult,
+  });
   const sidebarConnectors = CONNECTION_LANES.filter((lane) =>
     ["google", "github", "outlook", "slack"].includes(lane.id)
   );
@@ -2262,6 +2312,46 @@ export default function GhostFilterDashboard() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
+              <div className="flex items-start gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
+                      Ask Ghosti
+                    </span>
+                    <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-zinc-600">
+                      Safety assistant
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-300">{ghostiText}</p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
+                {[
+                  ["explain", "Explain"],
+                  ["action", "Next step"],
+                  ["reply", protectionMode === "agent" ? "Use safely" : "Safe reply"],
+                  ["agent", "For GhostGPT"],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setGhostiMode(id as GhostiMode)}
+                    aria-pressed={ghostiMode === id}
+                    className={`rounded-md border px-2 py-2 text-[9px] font-bold uppercase tracking-wide ${
+                      ghostiMode === id
+                        ? "border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
+                        : "border-[var(--line)] bg-[var(--input)] text-zinc-500 hover:border-[var(--line-strong)] hover:text-zinc-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {protectionMode === "agent" && activeAgentResult && (

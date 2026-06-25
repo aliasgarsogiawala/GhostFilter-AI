@@ -3,34 +3,61 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GhostFilter Guard</title>
+    <title>Ghosti Guard</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main>
-      <header>
-        <div class="mark">GF</div>
+      <header class="hero">
+        <div class="mark">G</div>
         <div>
-          <h1>GhostFilter Guard</h1>
-          <p>Scan selected text before GhostGPT reads it.</p>
+          <h1>Ghosti Guard</h1>
+          <p>Your browser-side safety assistant for scams and GhostGPT context.</p>
         </div>
       </header>
 
-      <label>
+      <label class="field">
         API base URL
         <input id="apiBase" value="http://localhost:3000" />
       </label>
 
-      <button id="scan">Scan selected text</button>
+      <div class="actions">
+        <button id="scanSelection">Scan selected text</button>
+        <button id="scanPage" class="secondary">Scan whole page</button>
+      </div>
+
+      <p class="hint">Tip: highlight a suspicious DM, email, webpage paragraph, or tool output before scanning.</p>
 
       <section id="result" hidden>
-        <div class="verdict">
-          <span id="verdictDot"></span>
-          <strong id="title"></strong>
+        <div class="verdict-card">
+          <div class="verdict">
+            <span id="verdictDot"></span>
+            <strong id="title"></strong>
+          </div>
+          <p id="summary"></p>
+          <div class="meta">
+            <span id="scorePill">Risk --</span>
+            <span id="actionPill">Action --</span>
+          </div>
         </div>
-        <p id="summary"></p>
-        <textarea id="safeContext" readonly></textarea>
-        <button id="copy">Copy safe context</button>
+
+        <div class="ghosti">
+          <div class="ghosti-head">
+            <span>👻</span>
+            <strong>Ghosti says</strong>
+          </div>
+          <p id="ghostiAdvice"></p>
+        </div>
+
+        <details>
+          <summary>Safe GhostGPT context</summary>
+          <textarea id="safeContext" readonly></textarea>
+        </details>
+
+        <div class="actions">
+          <button id="copy">Copy safe context</button>
+          <button id="openDashboard" class="secondary">Open dashboard</button>
+        </div>
       </section>
 
       <p id="status"></p>
