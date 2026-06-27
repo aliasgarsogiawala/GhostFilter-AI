@@ -5,14 +5,17 @@ import { google } from "googleapis";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { runPipeline } from "./pipeline";
+import { decryptSecret } from "../lib/secretBox";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 const MAX_FILES = 30;
 const TEXT_MIME = "text/plain";
 const DOC_MIME = "application/vnd.google-apps.document";
 
 export const scanDrive = action({
-  args: { ownerId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), ownerToken: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{ scanned: number; total: number }> => {
+    await assertOwnerToken(ownerId, ownerToken);
     const max = Math.min(MAX_FILES, Math.max(1, limit ?? 25));
     // Reuses the existing Google (Gmail) connection — same OAuth, now with the drive.readonly
     // scope. Attackers share malicious Google Docs (phishing links) to bypass email filters,
@@ -27,8 +30,8 @@ export const scanDrive = action({
       process.env.GOOGLE_CLIENT_SECRET
     );
     oauth2Client.setCredentials({
-      access_token: connection.accessToken,
-      refresh_token: connection.refreshToken,
+      access_token: decryptSecret(connection.accessToken),
+      refresh_token: connection.refreshToken ? decryptSecret(connection.refreshToken) : undefined,
     });
     const drive = google.drive({ version: "v3", auth: oauth2Client });
 
@@ -78,7 +81,7 @@ export const scanDrive = action({
       await ctx.runMutation(internal.scanResults.insert, {
         ownerId,
         connectionId: connection._id,
-        provider: "gmail", // shares the Google connection; "gmail" is the stored provider
+        provider: "drive",
         externalId: `drive:${f.id}`,
         subject: f.name ?? "Shared file",
         snippet: text,

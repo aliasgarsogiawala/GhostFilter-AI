@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
+import { signOut, useSession } from "next-auth/react";
 import { ArrowLeft, ShieldAlert, ShieldCheck, ScanSearch, Sparkles, Link2, Activity, Moon, Sun } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import { useOwnerId } from "@/lib/useOwnerId";
+import { useOwnerAuth } from "@/lib/useOwnerAuth";
 import { useAppearance, useTheme, THEMES } from "@/lib/useTheme";
+import { AuthRequired } from "@/components/AuthRequired";
 
 const VERDICT_COLOR: Record<string, string> = {
   safe: "var(--accent)",
@@ -80,11 +82,25 @@ function StatTile({
 
 export default function ProfilePage() {
   useTheme(); // apply persisted accent on this route too
-  const ownerId = useOwnerId();
-  const a = useQuery(api.scanResults.analyticsForOwner, ownerId ? { ownerId } : "skip");
+  const { data: session, status } = useSession();
+  const ownerAuth = useOwnerAuth();
+  const ownerId = ownerAuth.ownerId;
+  const a = useQuery(api.scanResults.analyticsForOwner, ownerAuth.args ?? "skip");
 
   const total = a?.total ?? 0;
   const maxVerdict = a ? Math.max(1, a.byVerdict.safe, a.byVerdict.suspicious, a.byVerdict.scam) : 1;
+
+  if (status === "loading") {
+    return (
+      <main className="min-h-screen bg-[var(--ink)] px-5 py-10 text-zinc-500">
+        <div className="mx-auto max-w-5xl text-sm">Loading secure session...</div>
+      </main>
+    );
+  }
+
+  if (!ownerId) {
+    return <AuthRequired title="Sign in to view analytics" />;
+  }
 
   return (
     <div className="bg-dot-grid min-h-screen w-full text-zinc-300">
@@ -106,7 +122,16 @@ export default function ProfilePage() {
             <p className="text-[11px] text-zinc-500">Your protection analytics</p>
           </div>
         </div>
-        <ThemeSwitcher />
+        <div className="flex items-center gap-2">
+          <ThemeSwitcher />
+          <button
+            onClick={() => void signOut({ callbackUrl: "/" })}
+            title={session?.user?.email ?? "Signed in"}
+            className="flex h-9 items-center rounded-md border border-[var(--line-strong)] bg-[var(--input)] px-3 text-[11px] font-semibold text-zinc-400 hover:border-[var(--danger)] hover:text-[var(--danger)]"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main className="relative z-10 mx-auto max-w-5xl px-5 py-6">
@@ -239,7 +264,7 @@ export default function ProfilePage() {
 
             <div className="flex items-center gap-2 px-1 text-[10px] text-zinc-600">
               <ShieldCheck className="h-3 w-3" />
-              Analytics are computed from your most recent 500 scans, stored privately for this browser session.
+              Analytics are computed from your most recent 500 scans, stored under your authenticated GhostFilter session.
             </div>
           </div>
         )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion";
+import { signOut, useSession } from "next-auth/react";
 import {
   Mail,
   Code2,
@@ -63,10 +64,11 @@ import {
 } from "lucide-react";
 import { BarChart3 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import { useOwnerId } from "@/lib/useOwnerId";
+import { useOwnerAuth } from "@/lib/useOwnerAuth";
 import { useAppearance } from "@/lib/useTheme";
 import { buildHighlightSegments } from "@/lib/highlight";
 import { analyzeAgentFirewall, type AgentFirewallResult } from "@/lib/agentFirewall";
+import { AuthRequired } from "@/components/AuthRequired";
 
 type Verdict = "safe" | "suspicious" | "scam";
 type Tone = "clear" | "warn" | "critical";
@@ -80,7 +82,7 @@ type GhostiMode = "explain" | "action" | "reply" | "agent";
 interface ScanResultDoc {
   _id: string;
   _creationTime: number;
-  provider: "gmail" | "github" | "outlook" | "slack" | "manual";
+  provider: "gmail" | "drive" | "github" | "outlook" | "slack" | "manual";
   subject?: string;
   snippet: string;
   verdict: Verdict;
@@ -140,6 +142,7 @@ function scanDayLabel(timestamp: number): string {
 const SOURCE_LABELS: Record<ScanResultDoc["provider"], string> = {
   manual: "Manual",
   gmail: "Google",
+  drive: "Drive",
   github: "GitHub",
   outlook: "Outlook",
   slack: "Slack",
@@ -991,12 +994,16 @@ function VerdictStamp({ verdict }: { verdict: Verdict }) {
 // ----------------------------------------------------------------------------
 
 export default function GhostFilterDashboard() {
-  const ownerId = useOwnerId();
-  const connections = useQuery(api.connections.listForOwner, ownerId ? { ownerId } : "skip");
-  const scans = useQuery(api.scanResults.listForOwner, ownerId ? { ownerId } : "skip") as
+  const { data: session, status: authStatus } = useSession();
+  const ownerAuth = useOwnerAuth();
+  const ownerId = ownerAuth.ownerId;
+  const ownerToken = ownerAuth.ownerToken;
+  const ownerArgs = ownerAuth.args;
+  const connections = useQuery(api.connections.listForOwner, ownerArgs ?? "skip");
+  const scans = useQuery(api.scanResults.listForOwner, ownerArgs ?? "skip") as
     | ScanResultDoc[]
     | undefined;
-  const agentScans = useQuery(api.agentScans.listForOwner, ownerId ? { ownerId } : "skip") as
+  const agentScans = useQuery(api.agentScans.listForOwner, ownerArgs ?? "skip") as
     | AgentScanDoc[]
     | undefined;
 
@@ -1042,6 +1049,18 @@ export default function GhostFilterDashboard() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  if (authStatus === "loading") {
+    return (
+      <main className="min-h-screen bg-[var(--ink)] px-5 py-10 text-zinc-500">
+        <div className="mx-auto max-w-6xl text-sm">Loading secure session...</div>
+      </main>
+    );
+  }
+
+  if (!ownerId) {
+    return <AuthRequired title="Sign in to open GhostFilter" />;
+  }
+
   const gmailConnection = connections?.find((c) => c.provider === "gmail" && c.status === "connected");
   const githubConnection = connections?.find((c) => c.provider === "github" && c.status === "connected");
   const slackConnection = connections?.find((c) => c.provider === "slack" && c.status === "connected");
@@ -1074,6 +1093,7 @@ export default function GhostFilterDashboard() {
     all: scans?.length ?? 0,
     manual: scans?.filter((scan) => scan.provider === "manual").length ?? 0,
     gmail: scans?.filter((scan) => scan.provider === "gmail").length ?? 0,
+    drive: scans?.filter((scan) => scan.provider === "drive").length ?? 0,
     github: scans?.filter((scan) => scan.provider === "github").length ?? 0,
     outlook: scans?.filter((scan) => scan.provider === "outlook").length ?? 0,
     slack: scans?.filter((scan) => scan.provider === "slack").length ?? 0,
@@ -1132,9 +1152,10 @@ export default function GhostFilterDashboard() {
     source: "manual" | "file" | "api" = "manual",
     subject?: string
   ) => {
-    if (!ownerId) return;
+    if (!ownerId || !ownerToken) return;
     const id = await saveAgentScan({
       ownerId,
+      ownerToken,
       source,
       subject,
       snippet: snippet.slice(0, 6000),
@@ -1150,7 +1171,7 @@ export default function GhostFilterDashboard() {
   };
 
   const analyzeText = async (text: string) => {
-    if (!ownerId || !text.trim() || analyzing) return;
+    if (!ownerId || !ownerToken || !text.trim() || analyzing) return;
     setAnalyzing(true);
     setAnalysisError(null);
     try {
@@ -1161,7 +1182,7 @@ export default function GhostFilterDashboard() {
         setActionStatus("GhostGPT firewall scan complete");
         return;
       }
-      const result = await analyzeMessage({ text, ownerId });
+      const result = await analyzeMessage({ text, ownerId, ownerToken });
       selectResult(result.id);
     } catch (err) {
       setAnalysisError(err instanceof Error ? err.message : "We couldn't analyze that message. Please try again.");
@@ -1175,7 +1196,7 @@ export default function GhostFilterDashboard() {
       await analyzeText(messageText);
       return;
     }
-    if (!ownerId || !uploadedFile || analyzing) return;
+    if (!ownerId || !ownerToken || !uploadedFile || analyzing) return;
     setAnalyzing(true);
     setAnalysisError(null);
     try {
@@ -1201,6 +1222,7 @@ export default function GhostFilterDashboard() {
         const result = await analyzeMessage({
           text: `Uploaded file: ${uploadedFile.name}\n\n${text.slice(0, 20_000)}`,
           ownerId,
+          ownerToken,
         });
         selectResult(result.id);
       } else {
@@ -1218,6 +1240,7 @@ export default function GhostFilterDashboard() {
         });
         const result = await analyzeUpload({
           ownerId,
+          ownerToken,
           filename: uploadedFile.name,
           mimeType: uploadedFile.type || "application/octet-stream",
           base64,
@@ -1275,15 +1298,15 @@ export default function GhostFilterDashboard() {
   };
 
   const runScan = async (kind: "inbox" | "drive" | "github" | "outlook" | "slack") => {
-    if (!ownerId || scanningKind) return;
+    if (!ownerId || !ownerToken || scanningKind) return;
     setScanningKind(kind);
     setScanError(null);
     try {
-      if (kind === "inbox") await scanInbox({ ownerId, limit: scanDepth });
-      else if (kind === "drive") await scanDrive({ ownerId, limit: scanDepth });
-      else if (kind === "github") await scanGithub({ ownerId, limit: scanDepth });
+      if (kind === "inbox") await scanInbox({ ownerId, ownerToken, limit: scanDepth });
+      else if (kind === "drive") await scanDrive({ ownerId, ownerToken, limit: scanDepth });
+      else if (kind === "github") await scanGithub({ ownerId, ownerToken, limit: scanDepth });
       else if (kind === "outlook") await scanOutlook({ ownerId, limit: scanDepth });
-      else await scanSlack({ ownerId, limit: scanDepth });
+      else await scanSlack({ ownerId, ownerToken, limit: scanDepth });
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Scan failed");
     } finally {
@@ -1293,37 +1316,37 @@ export default function GhostFilterDashboard() {
 
   const handleDisconnect = async (id?: string, providerLabel = "this account") => {
     const target = id ?? gmailConnection?._id;
-    if (!ownerId || !target) return;
+    if (!ownerId || !ownerToken || !target) return;
     const ok = window.confirm(
       `Disconnect ${providerLabel}?\n\nGhostFilter will lose access and stop scanning it. You'll need to reconnect (and re-authorize) before you can scan again.`
     );
     if (!ok) return;
-    await disconnect({ connectionId: target as never, ownerId });
+    await disconnect({ connectionId: target as never, ownerId, ownerToken });
   };
 
   const handleDeleteSelected = async () => {
-    if (!ownerId || !selected) return;
+    if (!ownerId || !ownerToken || !selected) return;
     const ok = window.confirm("Delete this scan from your history?");
     if (!ok) return;
-    await removeScan({ ownerId, scanResultId: selected._id as never });
+    await removeScan({ ownerId, ownerToken, scanResultId: selected._id as never });
     selectResult(null);
     setActionStatus("Scan deleted");
   };
 
   const handleClearHistory = async () => {
-    if (!ownerId || !scans?.length) return;
+    if (!ownerId || !ownerToken || !scans?.length) return;
     const ok = window.confirm(`Delete all ${scans.length} scans? This cannot be undone.`);
     if (!ok) return;
-    await clearScans({ ownerId });
+    await clearScans({ ownerId, ownerToken });
     selectResult(null);
     setActionStatus("History cleared");
   };
 
   const handleClearAgentHistory = async () => {
-    if (!ownerId || !agentScans?.length) return;
+    if (!ownerId || !ownerToken || !agentScans?.length) return;
     const ok = window.confirm(`Delete all ${agentScans.length} GhostGPT firewall scans?`);
     if (!ok) return;
-    await clearAgentScans({ ownerId });
+    await clearAgentScans({ ownerId, ownerToken });
     setSelectedAgentId(null);
     setAgentResult(null);
     setActionStatus("GhostGPT firewall history cleared");
@@ -1407,9 +1430,10 @@ export default function GhostFilterDashboard() {
   };
 
   const sendFeedback = async (expectedVerdict: Verdict) => {
-    if (!ownerId || !selected) return;
+    if (!ownerId || !ownerToken || !selected) return;
     await submitFeedback({
       ownerId,
+      ownerToken,
       scanResultId: selected._id as never,
       expectedVerdict,
     });
@@ -1476,6 +1500,20 @@ export default function GhostFilterDashboard() {
             <BarChart3 className="h-3.5 w-3.5" />
             History insights
           </Link>
+          <Link
+            href="/ghosti"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-3 text-[11px] font-semibold text-zinc-400 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            <Bot className="h-3.5 w-3.5" />
+            Ghosti
+          </Link>
+          <button
+            onClick={() => void signOut({ callbackUrl: "/" })}
+            title={session?.user?.email ?? "Signed in"}
+            className="flex h-9 items-center rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-3 text-[11px] font-semibold text-zinc-400 hover:border-[var(--danger)] hover:text-[var(--danger)]"
+          >
+            Sign out
+          </button>
         </div>
       </header>
 
@@ -1566,7 +1604,7 @@ export default function GhostFilterDashboard() {
                       ))}
                     </div>
                     <div className="mt-2 flex gap-1 overflow-x-auto pb-0.5" role="group" aria-label="Filter scans by source">
-                      {(["all", "manual", "gmail", "outlook", "slack", "github"] as const).map((source) => (
+                      {(["all", "manual", "gmail", "drive", "outlook", "slack", "github"] as const).map((source) => (
                         <button
                           key={source}
                           onClick={() => setSourceFilter(source)}
@@ -1670,7 +1708,7 @@ export default function GhostFilterDashboard() {
                                 </button>
                               </>
                             ) : (
-                              ownerId && <ConnectButton href={`/api/auth/google?ownerId=${ownerId}`} icon={Mail} label="Connect" />
+                              <ConnectButton href="/api/auth/google" icon={Mail} label="Connect" />
                             )}
                           </ConnectorMiniCard>
                         );
@@ -1689,7 +1727,7 @@ export default function GhostFilterDashboard() {
                                 </button>
                               </>
                             ) : (
-                              ownerId && <ConnectButton href={`/api/auth/github?ownerId=${ownerId}`} icon={Code2} label="Connect" />
+                              <ConnectButton href="/api/auth/github" icon={Code2} label="Connect" />
                             )}
                           </ConnectorMiniCard>
                         );
@@ -1716,7 +1754,7 @@ export default function GhostFilterDashboard() {
                               </button>
                             </>
                           ) : (
-                            ownerId && <ConnectButton href={`/api/auth/slack?ownerId=${ownerId}`} icon={MessagesSquare} label="Connect" />
+                            <ConnectButton href="/api/auth/slack" icon={MessagesSquare} label="Connect" />
                           )}
                         </ConnectorMiniCard>
                       );
@@ -2663,8 +2701,8 @@ export default function GhostFilterDashboard() {
                 {/* Always attempt the image — urlscan renders it within ~15-20s, so it may not
                     be ready the instant the scan returns, but resolves shortly after (and on any
                     later view of this result). If it isn't up yet, show a fallback note. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- urlscan image URLs are external and short-lived */}
                 <img
-                  // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable urlscan.io image
                   src={selected.screenshot.screenshotUrl}
                   alt="Sandboxed screenshot of the linked page"
                   className="w-full rounded border border-[var(--line)]"

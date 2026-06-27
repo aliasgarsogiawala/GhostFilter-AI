@@ -7,6 +7,8 @@ import {
 } from "./geminiKeys";
 
 const SUPPORTED_MIME_TYPES = new Set([
+  "text/plain",
+  "message/rfc822",
   "application/pdf",
   "image/jpeg",
   "image/png",
@@ -27,6 +29,14 @@ export async function extractTextFromUpload(args: {
   }
   if (!args.base64 || args.base64.length > MAX_BASE64_LENGTH) {
     throw new Error("That file is too large. Please upload a file smaller than 8 MB.");
+  }
+
+  if (args.mimeType === "text/plain" || args.mimeType === "message/rfc822" || /\.(txt|eml)$/i.test(args.filename)) {
+    const text = Buffer.from(args.base64, "base64").toString("utf-8").trim();
+    if (!text) {
+      throw new Error("We couldn't find readable text in that file. Try a clearer image or paste the message.");
+    }
+    return text.slice(0, 20_000);
   }
 
   const response = await generateExtractionWithRotation(args);

@@ -20,6 +20,7 @@ import {
   type EmailForensics,
 } from "../lib/emailHeaders";
 import { extractTextFromUpload } from "../lib/fileExtraction";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 const SIGNAL_LABELS = [
   "Urgency Language",
@@ -296,22 +297,24 @@ export async function runPipeline(
     if (socialEngineering.combinedImpersonationPayment || ensemble.hardScam) {
       verdict = "scam";
       confidence = Math.max(confidence, ensemble.score, 90);
-      summary =
-        "This message asks for money while claiming to be the real identity of another person, a strong impersonation-scam pattern.";
-      recommendation =
-        "Do not send money. Verify the person through a separate, trusted contact method.";
-      if (
-        socialEngineering.identityPhrase &&
-        !flaggedPhrases.some((finding) => finding.phrase === socialEngineering.identityPhrase)
-      ) {
-        flaggedPhrases = [
-          ...flaggedPhrases,
-          {
-            phrase: socialEngineering.identityPhrase,
-            reason: "An unverified identity claim is paired with a request for money.",
-            severity: "red",
-          },
-        ];
+      if (socialEngineering.combinedImpersonationPayment) {
+        summary =
+          "This message asks for money while claiming to be the real identity of another person, a strong impersonation-scam pattern.";
+        recommendation =
+          "Do not send money. Verify the person through a separate, trusted contact method.";
+        if (
+          socialEngineering.identityPhrase &&
+          !flaggedPhrases.some((finding) => finding.phrase === socialEngineering.identityPhrase)
+        ) {
+          flaggedPhrases = [
+            ...flaggedPhrases,
+            {
+              phrase: socialEngineering.identityPhrase,
+              reason: "An unverified identity claim is paired with a request for money.",
+              severity: "red",
+            },
+          ];
+        }
       }
     } else if (injection.detected) verdict = "scam";
     else if (verdict === "safe") verdict = "suspicious";
@@ -335,13 +338,16 @@ export async function runPipeline(
 }
 
 export const analyzeMessage = action({
-  args: { text: v.string(), ownerId: v.string() },
-  handler: async (ctx, { text, ownerId }): Promise<PipelineResult & { id: string }> => {
-    const result = await runPipeline(text);
+  args: { text: v.string(), ownerId: v.string(), ownerToken: v.string() },
+  handler: async (ctx, { text, ownerId, ownerToken }): Promise<PipelineResult & { id: string }> => {
+    await assertOwnerToken(ownerId, ownerToken);
+    const boundedText = text.slice(0, 20_000);
+    if (!boundedText.trim()) throw new Error("Message text is required.");
+    const result = await runPipeline(boundedText);
     const id: string = await ctx.runMutation(internal.scanResults.insert, {
       ownerId,
       provider: "manual",
-      snippet: text.slice(0, 4000),
+      snippet: boundedText.slice(0, 4000),
       verdict: result.verdict,
       mlScore: result.mlScore,
       confidence: result.confidence,
@@ -363,13 +369,15 @@ export const analyzeMessage = action({
 export const analyzeUpload = action({
   args: {
     ownerId: v.string(),
+    ownerToken: v.string(),
     filename: v.string(),
     mimeType: v.string(),
     base64: v.string(),
   },
   handler: async (ctx, args): Promise<PipelineResult & { id: string; extractedText: string }> => {
+    await assertOwnerToken(args.ownerId, args.ownerToken);
     const extractedText = await extractTextFromUpload(args);
-    const text = `Uploaded file: ${args.filename}\n\n${extractedText}`;
+    const text = `Uploaded file: ${args.filename.slice(0, 200)}\n\n${extractedText}`.slice(0, 20_000);
     const result = await runPipeline(text);
     const id: string = await ctx.runMutation(internal.scanResults.insert, {
       ownerId: args.ownerId,

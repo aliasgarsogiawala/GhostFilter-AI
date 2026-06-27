@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 export const insert = internalMutation({
   args: {
     ownerId: v.string(),
     connectionId: v.optional(v.id("connections")),
-    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("outlook"), v.literal("slack"), v.literal("manual")),
+    provider: v.union(v.literal("gmail"), v.literal("drive"), v.literal("github"), v.literal("outlook"), v.literal("slack"), v.literal("manual")),
     externalId: v.optional(v.string()),
     subject: v.optional(v.string()),
     snippet: v.string(),
@@ -91,8 +92,9 @@ export const insert = internalMutation({
 });
 
 export const listForOwner = query({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }) => {
+  args: { ownerId: v.string(), ownerToken: v.string() },
+  handler: async (ctx, { ownerId, ownerToken }) => {
+    await assertOwnerToken(ownerId, ownerToken);
     return await ctx.db
       .query("scanResults")
       .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
@@ -102,8 +104,9 @@ export const listForOwner = query({
 });
 
 export const analyticsForOwner = query({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }) => {
+  args: { ownerId: v.string(), ownerToken: v.string() },
+  handler: async (ctx, { ownerId, ownerToken }) => {
+    await assertOwnerToken(ownerId, ownerToken);
     const rows = await ctx.db
       .query("scanResults")
       .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
@@ -165,8 +168,9 @@ export const analyticsForOwner = query({
 });
 
 export const remove = mutation({
-  args: { ownerId: v.string(), scanResultId: v.id("scanResults") },
-  handler: async (ctx, { ownerId, scanResultId }) => {
+  args: { ownerId: v.string(), ownerToken: v.string(), scanResultId: v.id("scanResults") },
+  handler: async (ctx, { ownerId, ownerToken, scanResultId }) => {
+    await assertOwnerToken(ownerId, ownerToken);
     const row = await ctx.db.get(scanResultId);
     if (!row || row.ownerId !== ownerId) throw new Error("Scan not found");
 
@@ -180,8 +184,9 @@ export const remove = mutation({
 });
 
 export const clearForOwner = mutation({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }) => {
+  args: { ownerId: v.string(), ownerToken: v.string() },
+  handler: async (ctx, { ownerId, ownerToken }) => {
+    await assertOwnerToken(ownerId, ownerToken);
     const [rows, feedback] = await Promise.all([
       ctx.db
         .query("scanResults")
@@ -203,11 +208,13 @@ export const clearForOwner = mutation({
 export const submitFeedback = mutation({
   args: {
     ownerId: v.string(),
+    ownerToken: v.string(),
     scanResultId: v.id("scanResults"),
     expectedVerdict: v.union(v.literal("safe"), v.literal("suspicious"), v.literal("scam")),
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertOwnerToken(args.ownerId, args.ownerToken);
     const row = await ctx.db.get(args.scanResultId);
     if (!row || row.ownerId !== args.ownerId) throw new Error("Scan not found");
 

@@ -1,15 +1,18 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 export const upsertGmail = mutation({
   args: {
     ownerId: v.string(),
+    ownerToken: v.string(),
     accessToken: v.string(),
     refreshToken: v.optional(v.string()),
     expiresAt: v.optional(v.number()),
     accountEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertOwnerToken(args.ownerId, args.ownerToken);
     const existing = await ctx.db
       .query("connections")
       .withIndex("by_owner_provider", (q) => q.eq("ownerId", args.ownerId).eq("provider", "gmail"))
@@ -41,10 +44,12 @@ export const upsertGmail = mutation({
 export const upsertGithub = mutation({
   args: {
     ownerId: v.string(),
+    ownerToken: v.string(),
     accessToken: v.string(),
     accountName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertOwnerToken(args.ownerId, args.ownerToken);
     const existing = await ctx.db
       .query("connections")
       .withIndex("by_owner_provider", (q) => q.eq("ownerId", args.ownerId).eq("provider", "github"))
@@ -112,10 +117,12 @@ export const upsertOutlook = mutation({
 export const upsertSlack = mutation({
   args: {
     ownerId: v.string(),
+    ownerToken: v.string(),
     accessToken: v.string(),
     accountName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertOwnerToken(args.ownerId, args.ownerToken);
     const existing = await ctx.db
       .query("connections")
       .withIndex("by_owner_provider", (q) => q.eq("ownerId", args.ownerId).eq("provider", "slack"))
@@ -142,19 +149,26 @@ export const upsertSlack = mutation({
 
 // Public list — strips tokens before returning, never expose them to the client.
 export const listForOwner = query({
-  args: { ownerId: v.string() },
-  handler: async (ctx, { ownerId }) => {
+  args: { ownerId: v.string(), ownerToken: v.string() },
+  handler: async (ctx, { ownerId, ownerToken }) => {
+    await assertOwnerToken(ownerId, ownerToken);
     const rows = await ctx.db
       .query("connections")
       .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
       .collect();
-    return rows.map(({ accessToken: _accessToken, refreshToken: _refreshToken, ...safe }) => safe);
+    return rows.map((row) => {
+      const { accessToken, refreshToken, ...safe } = row;
+      void accessToken;
+      void refreshToken;
+      return safe;
+    });
   },
 });
 
 export const disconnect = mutation({
-  args: { connectionId: v.id("connections"), ownerId: v.string() },
-  handler: async (ctx, { connectionId, ownerId }) => {
+  args: { connectionId: v.id("connections"), ownerId: v.string(), ownerToken: v.string() },
+  handler: async (ctx, { connectionId, ownerId, ownerToken }) => {
+    await assertOwnerToken(ownerId, ownerToken);
     const row = await ctx.db.get(connectionId);
     if (!row || row.ownerId !== ownerId) throw new Error("Connection not found");
     await ctx.db.patch(connectionId, {

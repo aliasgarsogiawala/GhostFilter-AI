@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { AuthSessionProvider } from "./AuthSessionProvider";
 import "./globals.css";
 
 // Space Grotesk (geometric, characterful) for UI + display, JetBrains Mono for
@@ -19,8 +20,19 @@ const dataMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GhostFilter AI — Scam & Phishing Shield",
-  description: "AI-powered scam and phishing message analyzer.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  title: {
+    default: "GhostFilter AI | Human and Agent Safety Firewall",
+    template: "%s | GhostFilter AI",
+  },
+  description:
+    "Detect scams and phishing for people, and block prompt injection before untrusted content reaches AI agents.",
+  applicationName: "GhostFilter AI",
+  openGraph: {
+    title: "GhostFilter AI",
+    description: "A safety firewall for people and AI agents.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -35,7 +47,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <RootProvider theme={{ attribute: "class", forcedTheme: "dark" }}>
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <AuthSessionProvider>
+            <ConvexClientProvider>{children}</ConvexClientProvider>
+          </AuthSessionProvider>
         </RootProvider>
       </body>
     </html>

@@ -45,7 +45,9 @@ export async function scanAndCapture(url: string, maxWaitMs = 20000): Promise<Ur
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     try {
-      const check = await fetch(apiResultUrl);
+      const check = await fetch(apiResultUrl, {
+        headers: { "API-Key": getApiKey() },
+      });
       if (check.ok) return { url, uuid, resultUrl, screenshotUrl, ready: true };
     } catch {
       // keep polling until the time budget runs out

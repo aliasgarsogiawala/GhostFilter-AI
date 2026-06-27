@@ -103,7 +103,7 @@ const IDENTITY_CLAIM_RE =
 const TRUST_CLAIM_RE =
   /\b(?:i\s*(?:am|'?m)|im|this\s+is|it\s+is)\s+(?:really\s+|actually\s+)?(?:the\s+)?(?:real|official|verified)\s+[a-z][a-z'-]*(?:\s+[a-z][a-z'-]*){0,4}/i;
 const MONEY_OR_CODE_RE =
-  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|rent|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|code|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
 const PAYMENT_VERB_RE =
   /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward|connect|enter|submit)\b/i;
 const PRESSURE_RE =
@@ -113,10 +113,11 @@ const PRIZE_CRYPTO_JOB_RE =
 const SUPPORT_IMPERSONATION_RE =
   /\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank|support|admin|security)\b.{0,35}\b(?:support|security|team|admin|official|verification|helpdesk|copyright|appeal)\b|\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank)\s+(?:support|copyright|appeal)\b/i;
 const ACCOUNT_SECURITY_RE =
-  /\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b.{0,45}\b(?:blocked|locked|suspended|verify|verification|kyc|reactivate|restore|deleted|disabled|appeal)\b|\b(?:blocked|locked|suspended|deleted|disabled)\b.{0,45}\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b/i;
+  /\b(?:account|apple\s*id|kyc|card|bank|upi|netbanking|profile|page)\b.{0,45}\b(?:blocked|locked|suspended|verify|verification|kyc|reactivate|restore|deleted|disabled|appeal)\b|\b(?:blocked|locked|suspended|deleted|disabled)\b.{0,45}\b(?:account|apple\s*id|kyc|card|bank|upi|netbanking|profile|page)\b/i;
 const HAS_URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
+const PASSWORD_REQUEST_RE = /\b(?:send|share|tell|reply with|enter|submit)\b.{0,50}\b(?:password|passcode|login|credentials?)\b|\b(?:password|passcode|login|credentials?)\b.{0,50}\b(?:send|share|tell|reply|enter|submit)\b/i;
 const SECRET_CREDENTIAL_RE =
-  /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed)\b/i;
+  /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed|password|passcode|credentials?)\b/i;
 // Small subset of lib/promptInjection.ts — language aimed at manipulating an AI reviewer
 // embedded inside the very content being scanned (itself a strong scam/abuse signal).
 const AI_MANIPULATION_RE = [
@@ -161,6 +162,7 @@ export function checkScam(input: string): ProtectResult {
   const supportImpersonation = SUPPORT_IMPERSONATION_RE.test(text);
   const accountSecurity = ACCOUNT_SECURITY_RE.test(text);
   const hasUrl = HAS_URL_RE.test(text);
+  const passwordRequest = PASSWORD_REQUEST_RE.test(text);
   const secretCredentialRequest = SECRET_CREDENTIAL_RE.test(text);
   const aiManipulation = AI_MANIPULATION_RE.some((re) => re.test(text));
 
@@ -188,6 +190,10 @@ export function checkScam(input: string): ProtectResult {
     layers.push({ label: "Account/KYC takeover lure", score: hasUrl ? 94 : 74, evidence: text.match(ACCOUNT_SECURITY_RE)?.[0] ?? "account security warning" });
     categories.push("account-security-threat");
   }
+  if (passwordRequest) {
+    layers.push({ label: "Password or credential request", score: 96, evidence: text.match(PASSWORD_REQUEST_RE)?.[0] ?? "password or credential request" });
+    categories.push("credential-request");
+  }
   if (aiManipulation) {
     layers.push({ label: "AI manipulation language", score: 78, evidence: "language aimed at manipulating an automated reviewer" });
     categories.push("ai-manipulation-language");
@@ -198,6 +204,7 @@ export function checkScam(input: string): ProtectResult {
     (paymentLike && trustClaim) ||
     (paymentLike && supportImpersonation) ||
     (paymentLike && prizeCryptoJob) ||
+    passwordRequest ||
     (paymentLike && secretCredentialRequest) ||
     (prizeCryptoJob && hasUrl) ||
     (accountSecurity && hasUrl);

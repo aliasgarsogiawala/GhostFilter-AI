@@ -4,6 +4,8 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { runPipeline } from "./pipeline";
+import { decryptSecret } from "../lib/secretBox";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 interface GithubNotification {
   id: string;
@@ -15,8 +17,9 @@ interface GithubNotification {
 const MAX_NOTIFICATIONS = 50;
 
 export const scanNotifications = action({
-  args: { ownerId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), ownerToken: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{ scanned: number; total: number }> => {
+    await assertOwnerToken(ownerId, ownerToken);
     const max = Math.min(MAX_NOTIFICATIONS, Math.max(1, limit ?? 25));
     const connection = await ctx.runQuery(internal.connections.getActiveGithub, { ownerId });
     if (!connection) {
@@ -25,7 +28,7 @@ export const scanNotifications = action({
 
     const res = await fetch(`https://api.github.com/notifications?all=true&per_page=${max}`, {
       headers: {
-        Authorization: `Bearer ${connection.accessToken}`,
+        Authorization: `Bearer ${decryptSecret(connection.accessToken)}`,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },

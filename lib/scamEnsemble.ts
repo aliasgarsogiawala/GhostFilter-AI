@@ -19,7 +19,7 @@ export interface ScamEnsembleResult {
 }
 
 const MONEY_OR_CODE_RE =
-  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|rent|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|code|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
 
 const PAYMENT_VERB_RE = /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward|connect|enter|submit)\b/i;
 
@@ -36,9 +36,11 @@ const SUPPORT_IMPERSONATION_RE =
   /\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank|support|admin|security)\b.{0,35}\b(?:support|security|team|admin|official|verification|helpdesk|copyright|appeal)\b|\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank)\s+(?:support|copyright|appeal)\b/i;
 
 const ACCOUNT_SECURITY_RE =
-  /\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b.{0,45}\b(?:blocked|locked|suspended|verify|verification|kyc|reactivate|restore|deleted|disabled|appeal)\b|\b(?:blocked|locked|suspended|deleted|disabled)\b.{0,45}\b(?:account|kyc|card|bank|upi|netbanking|profile|page)\b/i;
+  /\b(?:account|apple\s*id|kyc|card|bank|upi|netbanking|profile|page)\b.{0,45}\b(?:blocked|locked|suspended|verify|verification|kyc|reactivate|restore|deleted|disabled|appeal)\b|\b(?:blocked|locked|suspended|deleted|disabled)\b.{0,45}\b(?:account|apple\s*id|kyc|card|bank|upi|netbanking|profile|page)\b/i;
 
 const URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
+const PASSWORD_REQUEST_RE = /\b(?:send|share|tell|reply with|enter|submit)\b.{0,50}\b(?:password|passcode|login|credentials?)\b|\b(?:password|passcode|login|credentials?)\b.{0,50}\b(?:send|share|tell|reply|enter|submit)\b/i;
+const STRONG_SECRET_RE = /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed|password|passcode|credentials?)\b/i;
 
 function clampScore(score: number) {
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -74,7 +76,8 @@ export function analyzeScamEnsemble(
   const supportImpersonation = SUPPORT_IMPERSONATION_RE.test(text);
   const accountSecurity = ACCOUNT_SECURITY_RE.test(text);
   const hasUrl = URL_RE.test(text);
-  const secretCredentialRequest = /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed)\b/i.test(text);
+  const passwordRequest = PASSWORD_REQUEST_RE.test(text);
+  const secretCredentialRequest = STRONG_SECRET_RE.test(text);
   const forensicHit = !!opts.forensics?.indicators.some((indicator) => indicator.severity === "red");
 
   addLayer(layers, {
@@ -168,6 +171,21 @@ export function analyzeScamEnsemble(
     });
   }
 
+  if (passwordRequest) {
+    const phrase = text.match(PASSWORD_REQUEST_RE)?.[0] ?? "password or credential request";
+    addLayer(layers, {
+      label: "Password or credential request",
+      score: 96,
+      evidence: phrase,
+      explanation: "Legitimate teams should not ask you to send passwords, passcodes, or login credentials in a message.",
+    });
+    flaggedPhrases.push({
+      phrase,
+      reason: "Requests for passwords or credentials are direct account-takeover indicators.",
+      severity: "red",
+    });
+  }
+
   if (opts.injection.detected) {
     addLayer(layers, {
       label: "AI manipulation language",
@@ -192,6 +210,7 @@ export function analyzeScamEnsemble(
     (paymentLike && trustClaim) ||
     (paymentLike && supportImpersonation) ||
     (paymentLike && prizeCryptoJob) ||
+    passwordRequest ||
     (paymentLike && secretCredentialRequest) ||
     (prizeCryptoJob && hasUrl) ||
     (accountSecurity && hasUrl) ||

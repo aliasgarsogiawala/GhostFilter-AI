@@ -5,7 +5,7 @@ export default defineSchema({
   // One row per account a browser has connected. Tokens are stripped from the
   // public list query and only used by server-side scan actions.
   connections: defineTable({
-    ownerId: v.string(), // anonymous client id, stored in a cookie — no full auth system
+    ownerId: v.string(), // NextAuth session user id
     provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("outlook"), v.literal("slack")),
     status: v.union(v.literal("connected"), v.literal("disconnected")),
     accessToken: v.string(),
@@ -23,7 +23,7 @@ export default defineSchema({
   scanResults: defineTable({
     ownerId: v.string(),
     connectionId: v.optional(v.id("connections")),
-    provider: v.union(v.literal("gmail"), v.literal("github"), v.literal("outlook"), v.literal("slack"), v.literal("manual")),
+    provider: v.union(v.literal("gmail"), v.literal("drive"), v.literal("github"), v.literal("outlook"), v.literal("slack"), v.literal("manual")),
     externalId: v.optional(v.string()), // e.g. Gmail message id, for de-duplication
     subject: v.optional(v.string()),
     snippet: v.string(),

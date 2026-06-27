@@ -4,13 +4,13 @@
 
 export const GITHUB_SCOPE = "notifications";
 
-export function githubAuthUrl(ownerId: string): string {
+export function githubAuthUrl(state: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID ?? "",
     redirect_uri: `${baseUrl}/api/auth/github/callback`,
     scope: GITHUB_SCOPE,
-    state: ownerId,
+    state,
   });
   return `https://github.com/login/oauth/authorize?${params.toString()}`;
 }

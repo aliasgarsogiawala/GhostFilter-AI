@@ -283,6 +283,9 @@ export default function LandingPage() {
             <Link href="/eval" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
               Eval
             </Link>
+            <Link href="/ghosti" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
+              Ghosti
+            </Link>
             <Link href="/docs" className="hidden px-3 py-2 text-[11px] font-medium text-zinc-500 hover:text-zinc-200 md:block">
               Docs
             </Link>
@@ -330,13 +333,13 @@ export default function LandingPage() {
                   Open protection console
                   <ArrowRight className="h-4 w-4" />
                 </Link>
-                <a
-                  href="https://www.npmjs.com/package/ghostfilter-ai"
+                <Link
+                  href="/ghosti"
                   className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--panel)] px-5 text-[12px] font-medium text-zinc-300 hover:border-[var(--text-secondary)]"
                 >
-                  npm package
+                  Chat with Ghosti
                   <ChevronRight className="h-4 w-4" />
-                </a>
+                </Link>
               </div>
 
               <div className="mt-8 grid max-w-lg gap-2 sm:grid-cols-3">

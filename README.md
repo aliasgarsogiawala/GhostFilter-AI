@@ -1,5 +1,7 @@
 # GhostFilter AI
 
+For a judge-focused walkthrough, architecture explanation, demo script, and honest limitations, see [`JUDGES.md`](JUDGES.md). Deferred ideas are tracked separately in [`FUTURE_ENHANCEMENTS.md`](FUTURE_ENHANCEMENTS.md).
+
 GhostFilter AI is a multipurpose safety firewall for **people and AI agents**.
 
 It started as scam detection for suspicious messages, links, emails, and files. It now also protects **GhostGPT** from prompt injection before untrusted content enters an AI-agent context.
@@ -312,11 +314,17 @@ Create `.env.local`.
 | `CONVEX_DEPLOYMENT` | Yes | Convex deployment identifier. |
 | `NEXT_PUBLIC_CONVEX_SITE_URL` | Usually | Convex site URL. |
 | `NEXT_PUBLIC_APP_URL` | Optional | Defaults to `http://localhost:3000`; set in production. |
+| `NEXTAUTH_SECRET` | Yes for auth | Secret used by NextAuth sessions, connected-app OAuth state signing, and token encryption fallback. Generate a strong random value for production. |
+| `NEXTAUTH_URL` | Production | Public app URL used by NextAuth in deployed environments. |
+| `DEMO_AUTH_PASSWORD` | Required in production | Hackathon access code. Production sign-in fails closed when it is absent. |
+| `OAUTH_STATE_SECRET` | Optional | Separate HMAC secret for Google/GitHub/Slack connected-app OAuth state. Falls back to `NEXTAUTH_SECRET`. |
+| `OAUTH_TOKEN_ENCRYPTION_KEY` | Optional | Separate AES-GCM key source for stored connected-app tokens. Falls back to `NEXTAUTH_SECRET`. |
+| `OWNER_TOKEN_SECRET` | Optional | Separate HMAC secret for signed owner tokens passed from NextAuth to Convex. Falls back to `NEXTAUTH_SECRET`; set the same value in Convex env if you use this override. |
+| `GHOSTFILTER_API_KEY` | Optional | If set, `POST /api/ghostgpt/firewall` requires `Authorization: Bearer <key>`. |
+| `GHOSTI_OLLAMA_MODEL` | Optional | Local open-source model for Ghosti chat. Defaults to `qwen2.5:3b-instruct`. |
+| `OLLAMA_BASE_URL` | Optional | Local Ollama server URL. Defaults to `http://127.0.0.1:11434`. |
 | `GEMINI_API_KEY_1` | Yes for AI/file review | Primary Gemini key for structured verdicts and file extraction. Also set in Convex. |
 | `GEMINI_API_KEY_2` | Recommended | Backup Gemini key used automatically on quota/429/overload errors. |
-| `GEMINI_API_KEY_3` | Recommended | Backup Gemini key used automatically on quota/429/overload errors. |
-| `GEMINI_API_KEY_4` | Recommended | Backup Gemini key used automatically on quota/429/overload errors. |
-| `GEMINI_API_KEY` | Optional legacy fallback | Older single-key name; still supported if the numbered keys are not set. |
 | `GOOGLE_CLIENT_ID` | For Gmail/Drive | Google OAuth client ID. Also set in Convex. |
 | `GOOGLE_CLIENT_SECRET` | For Gmail/Drive | Google OAuth secret. Also set in Convex. |
 | `GITHUB_CLIENT_ID` | For GitHub | GitHub OAuth client ID. |
@@ -333,11 +341,15 @@ Gemini rotation setup:
 ```bash
 npx convex env set GEMINI_API_KEY_1 <key-1>
 npx convex env set GEMINI_API_KEY_2 <key-2>
-npx convex env set GEMINI_API_KEY_3 <key-3>
-npx convex env set GEMINI_API_KEY_4 <key-4>
 ```
 
-Local `.env.local` should use the same names. GhostFilter tries `_1` → `_4`, then falls back to `GEMINI_API_KEY`.
+Local `.env.local` should use the same names. GhostFilter tries `_1` first and rotates to `_2` on quota, overload, or other transient provider failures.
+
+After setting the real HTTPS app URL and production Convex deployment, validate the production environment:
+
+```bash
+npm run check:prod
+```
 
 Google OAuth redirect URI for local development:
 
@@ -408,10 +420,35 @@ CLI usage, and result shape. The web app also includes Fumadocs-powered docs at 
 
 - Connected Google/GitHub access is read-only.
 - GhostFilter cannot send messages, edit files, delete emails, or act on behalf of the user.
-- OAuth tokens are stored server-side in Convex, not exposed to the browser.
+- Web scan history and connected sources are tied to a NextAuth session instead of a browser-only anonymous id.
+- OAuth tokens are encrypted before storage in Convex, stored server-side, and never exposed to the browser.
+- Google/GitHub/Slack connected-app OAuth state is signed and expires before callback handling.
+- Public Ghosti and GhostGPT firewall API routes have in-process rate limits; deployed firewall middleware can also require `GHOSTFILTER_API_KEY`.
 - Results are guidance, not a guarantee.
 - For private chat apps, GhostFilter uses manual paste lanes instead of pretending it can read encrypted personal messages.
 - GhostGPT Firewall treats external content as untrusted data and does not execute tool actions.
+
+## Release verification
+
+Run the complete release gate:
+
+```bash
+npm run verify
+```
+
+This runs strict TypeScript checks, linting, the curated detection evaluation, dependency audit, and an optimized production build.
+
+Check the live AI providers and local-model fallback:
+
+```bash
+npm run health:ai
+```
+
+This verifies the local ML/firewall suite, local text extraction, each configured Gemini key, VirusTotal, urlscan.io, Ollama model availability, a real Ghosti response, and its deterministic fallback status. It reports key names and health only; secret values are never printed.
+
+## Future enhancements
+
+Ideas not completed for the hackathon are deliberately kept out of the shipped-feature list. See [`FUTURE_ENHANCEMENTS.md`](FUTURE_ENHANCEMENTS.md) for production identity, larger evaluations, hosted open-model inference, shared rate limiting, observability, Outlook, and browser-extension work.
 
 ## Why this can win a hackathon
 

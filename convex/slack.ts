@@ -4,6 +4,8 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { runPipeline } from "./pipeline";
+import { decryptSecret } from "../lib/secretBox";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 interface SlackConversation {
   id: string;
@@ -43,14 +45,16 @@ const MAX_CHANNELS = 8;
 const MAX_MESSAGES_PER_CHANNEL = 5;
 
 export const scanWorkspace = action({
-  args: { ownerId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), ownerToken: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{ scanned: number; total: number }> => {
+    await assertOwnerToken(ownerId, ownerToken);
     const connection = await ctx.runQuery(internal.connections.getActiveSlack, { ownerId });
     if (!connection) throw new Error("No connected Slack workspace for this session");
+    const accessToken = decryptSecret(connection.accessToken);
 
     const maxChannels = Math.min(MAX_CHANNELS, Math.max(1, Math.ceil((limit ?? 25) / MAX_MESSAGES_PER_CHANNEL)));
     const conversations = await slackApi<{ channels?: SlackConversation[] }>(
-      connection.accessToken,
+      accessToken,
       "conversations.list",
       {
         limit: String(maxChannels),
@@ -70,7 +74,7 @@ export const scanWorkspace = action({
       let history: { messages?: SlackMessage[] };
       try {
         history = await slackApi<{ messages?: SlackMessage[] }>(
-          connection.accessToken,
+          accessToken,
           "conversations.history",
           {
             channel: conversation.id,

@@ -5,12 +5,12 @@ export function slackRedirectUri() {
   return `${baseUrl}/api/auth/slack/callback`;
 }
 
-export function slackAuthUrl(ownerId: string) {
+export function slackAuthUrl(state: string) {
   const url = new URL("https://slack.com/oauth/v2/authorize");
   url.searchParams.set("client_id", process.env.SLACK_CLIENT_ID ?? "");
   url.searchParams.set("scope", SLACK_SCOPES.join(","));
   url.searchParams.set("redirect_uri", slackRedirectUri());
-  url.searchParams.set("state", ownerId);
+  url.searchParams.set("state", state);
   return url.toString();
 }
 

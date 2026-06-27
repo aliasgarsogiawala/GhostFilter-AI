@@ -8,6 +8,8 @@ import { internal } from "./_generated/api";
 import { runPipeline } from "./pipeline";
 import { checkFileHash } from "../lib/virustotal";
 import { rawHeadersFromList } from "../lib/emailHeaders";
+import { decryptSecret } from "../lib/secretBox";
+import { assertOwnerToken } from "../lib/ownerToken";
 
 function decodeBase64Url(data: string): string {
   return Buffer.from(data, "base64url").toString("utf-8");
@@ -121,8 +123,9 @@ function extractEmailContent(message: {
 const MAX_MESSAGES = 50;
 
 export const scanInbox = action({
-  args: { ownerId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { ownerId, limit }): Promise<{ scanned: number; total: number }> => {
+  args: { ownerId: v.string(), ownerToken: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{ scanned: number; total: number }> => {
+    await assertOwnerToken(ownerId, ownerToken);
     const max = Math.min(MAX_MESSAGES, Math.max(1, limit ?? 25));
     const connection = await ctx.runQuery(internal.connections.getActiveGmail, { ownerId });
     if (!connection) {
@@ -134,8 +137,8 @@ export const scanInbox = action({
       process.env.GOOGLE_CLIENT_SECRET
     );
     oauth2Client.setCredentials({
-      access_token: connection.accessToken,
-      refresh_token: connection.refreshToken,
+      access_token: decryptSecret(connection.accessToken),
+      refresh_token: connection.refreshToken ? decryptSecret(connection.refreshToken) : undefined,
     });
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
