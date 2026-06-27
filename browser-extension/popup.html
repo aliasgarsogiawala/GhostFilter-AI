@@ -20,13 +20,17 @@
         API base URL
         <input id="apiBase" value="http://localhost:3000" />
       </label>
+      <label class="field">
+        Firewall API key
+        <input id="apiKey" type="password" autocomplete="off" placeholder="Optional for local use" />
+      </label>
 
       <div class="actions">
         <button id="scanSelection">Scan selected text</button>
         <button id="scanPage" class="secondary">Scan whole page</button>
       </div>
 
-      <p class="hint">Tip: highlight a suspicious DM, email, webpage paragraph, or tool output before scanning.</p>
+      <p class="hint">Page text is sent only to the GhostFilter API URL above. Highlight the smallest useful section when possible.</p>
 
       <section id="result" hidden>
         <div class="verdict-card">

@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "GhostFilter Guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scan selected webpage text for prompt injection before sending it to GhostGPT.",
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["http://localhost:3000/*", "https://*/*"],
+  "host_permissions": ["http://localhost:3000/*", "http://localhost:3001/*"],
+  "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_title": "GhostFilter Guard",
     "default_popup": "popup.html"

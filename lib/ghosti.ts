@@ -106,9 +106,13 @@ Ghosti: "That wording is itself a red flag because it tries to manipulate the sa
 async function callOllama(messages: GhostiChatMessage[], context: ReturnType<typeof buildTrainingContext>) {
   const baseUrl = (process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_URL).replace(/\/$/, "");
   const model = process.env.GHOSTI_OLLAMA_MODEL ?? DEFAULT_MODEL;
+  const ollamaApiKey = process.env.OLLAMA_API_KEY?.trim();
   const response = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(ollamaApiKey ? { Authorization: `Bearer ${ollamaApiKey}` } : {}),
+    },
     body: JSON.stringify({
       model,
       stream: false,

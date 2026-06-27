@@ -1,0 +1,9 @@
+.convex
+.git
+.next
+.source
+node_modules
+packages/ghostfilter-ai/node_modules
+packages/ghostfilter-ai/dist
+scripts/data
+*.tsbuildinfo

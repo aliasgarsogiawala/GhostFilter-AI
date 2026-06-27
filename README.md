@@ -321,8 +321,11 @@ Create `.env.local`.
 | `OAUTH_TOKEN_ENCRYPTION_KEY` | Optional | Separate AES-GCM key source for stored connected-app tokens. Falls back to `NEXTAUTH_SECRET`. |
 | `OWNER_TOKEN_SECRET` | Optional | Separate HMAC secret for signed owner tokens passed from NextAuth to Convex. Falls back to `NEXTAUTH_SECRET`; set the same value in Convex env if you use this override. |
 | `GHOSTFILTER_API_KEY` | Optional | If set, `POST /api/ghostgpt/firewall` requires `Authorization: Bearer <key>`. |
+| `UPSTASH_REDIS_REST_URL` | Production recommended | Enables shared rate limiting across server instances. |
+| `UPSTASH_REDIS_REST_TOKEN` | Production recommended | Bearer token for the Upstash Redis REST API. |
 | `GHOSTI_OLLAMA_MODEL` | Optional | Local open-source model for Ghosti chat. Defaults to `qwen2.5:3b-instruct`. |
 | `OLLAMA_BASE_URL` | Optional | Local Ollama server URL. Defaults to `http://127.0.0.1:11434`. |
+| `OLLAMA_API_KEY` | Hosted Ollama only | Optional bearer token for a protected remote Ollama-compatible endpoint. |
 | `GEMINI_API_KEY_1` | Yes for AI/file review | Primary Gemini key for structured verdicts and file extraction. Also set in Convex. |
 | `GEMINI_API_KEY_2` | Recommended | Backup Gemini key used automatically on quota/429/overload errors. |
 | `GOOGLE_CLIENT_ID` | For Gmail/Drive | Google OAuth client ID. Also set in Convex. |
@@ -423,7 +426,7 @@ CLI usage, and result shape. The web app also includes Fumadocs-powered docs at 
 - Web scan history and connected sources are tied to a NextAuth session instead of a browser-only anonymous id.
 - OAuth tokens are encrypted before storage in Convex, stored server-side, and never exposed to the browser.
 - Google/GitHub/Slack connected-app OAuth state is signed and expires before callback handling.
-- Public Ghosti and GhostGPT firewall API routes have in-process rate limits; deployed firewall middleware can also require `GHOSTFILTER_API_KEY`.
+- Public Ghosti and GhostGPT firewall API routes use shared Upstash rate limits when configured and a bounded in-process fallback otherwise; firewall middleware can also require `GHOSTFILTER_API_KEY`.
 - Results are guidance, not a guarantee.
 - For private chat apps, GhostFilter uses manual paste lanes instead of pretending it can read encrypted personal messages.
 - GhostGPT Firewall treats external content as untrusted data and does not execute tool actions.
@@ -448,7 +451,7 @@ This verifies the local ML/firewall suite, local text extraction, each configure
 
 ## Future enhancements
 
-Ideas not completed for the hackathon are deliberately kept out of the shipped-feature list. See [`FUTURE_ENHANCEMENTS.md`](FUTURE_ENHANCEMENTS.md) for production identity, larger evaluations, hosted open-model inference, shared rate limiting, observability, Outlook, and browser-extension work.
+Ideas not completed for the hackathon are deliberately kept out of the shipped-feature list. See [`FUTURE_ENHANCEMENTS.md`](FUTURE_ENHANCEMENTS.md) for passkeys, larger external evaluations, hosted open-model inference, observability, Outlook, and browser-store distribution.
 
 ## Why this can win a hackathon
 

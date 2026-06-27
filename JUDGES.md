@@ -25,9 +25,10 @@ GhostFilter evaluates both threat classes in one explainable pipeline.
 | GitHub and Slack | Shipped when OAuth is configured | Read-only scanning of allowed account/workspace content. |
 | History, analytics, and feedback | Shipped | Stores per-user results and correction feedback in Convex. |
 | Developer SDK and CLI | Shipped | Reusable local-first `ghostfilter-ai` package. |
-| Judge demo and evaluation | Shipped | `/demo` and `/eval` provide deterministic demonstrations. |
+| Judge demo and evaluation | Shipped | `/demo` and `/eval` provide deterministic demonstrations across 50 regression cases. |
+| Ghosti Guard extension | Shipped prototype | Scans selected/page text with origin-specific permission and optional firewall API authentication. |
 
-Outlook and the browser extension are not part of the judged production path. Their current code is retained as future integration work.
+Outlook is not part of the judged production path. The browser extension is provided as a load-unpacked prototype rather than a store listing.
 
 ## Best five-minute demo
 
@@ -151,7 +152,7 @@ Ghosti is an MVP chat assistant specialized for scam, phishing, account-security
 - Secrets are server-side environment variables and `.env*` files are gitignored.
 - GhostFilter never sends payments, messages, deletes email, or executes scanned commands.
 
-The current rate limiter is process-local. A multi-instance production deployment should replace it with Redis or another shared store.
+The rate limiter uses Upstash Redis when configured and falls back to bounded process-local storage if the shared service is unavailable.
 
 ## Architecture
 
@@ -222,7 +223,7 @@ This fails if required production variables are absent, core secrets are weak, U
 - Ghosti is prompt-grounded, not fine-tuned or independently safety certified.
 - Ollama must run on infrastructure reachable by the deployed server to use the open model.
 - Binary PDF/image text extraction still relies on Gemini.
-- Rate limiting is process-local.
+- Multi-instance rate limiting requires the documented Upstash credentials; otherwise it degrades to process-local enforcement.
 - The credentials login is a hackathon access gate, not a consumer identity system.
 
 Longer-term product ideas and engineering work are tracked in `FUTURE_ENHANCEMENTS.md`.

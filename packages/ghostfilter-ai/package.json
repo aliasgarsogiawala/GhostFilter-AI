@@ -1,6 +1,6 @@
 {
   "name": "ghostfilter-ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Safety firewall SDK for humans and AI agents — scan untrusted text for scams/phishing and prompt-injection before you (or your agent) trust it.",
   "type": "module",
   "main": "./dist/src/index.js",

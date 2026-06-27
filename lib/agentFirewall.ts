@@ -34,6 +34,9 @@ const FINDING_RULES: Array<{
       /disregard (all|any|the)?\s*(previous|prior|above|earlier)?\s*(instructions?|prompt|rules?)/i,
       /forget (all|any|the)?\s*(previous|prior|above|earlier)?\s*(instructions?|prompt|rules?)/i,
       /new (system|developer|assistant)?\s*instructions?\s*:/i,
+      /new (?:highest[-\s]?priority|authoritative) instruction/i,
+      /ignore\b.{0,30}\b(?:security|safety|system|developer)\s*(?:rules?|policies|instructions?)/i,
+      /disregard\b.{0,40}\b(?:user(?:'s)?|original)\s+(?:task|request|instructions?)/i,
       /you are now (a|an|the)?\s*(system|developer|admin|root|unrestricted|jailbroken)/i,
     ],
   },
@@ -46,6 +49,7 @@ const FINDING_RULES: Array<{
       /print (your|the)?\s*(system|developer)?\s*prompt/i,
       /show (me )?(your|the)?\s*(hidden|system|developer)?\s*(prompt|instructions|rules)/i,
       /what (are|is) your (system|developer|hidden) (prompt|instructions|rules)/i,
+      /(?:disclose|reveal|show)\b.{0,30}\bhidden (?:policies|rules|instructions)/i,
     ],
   },
   {
@@ -66,6 +70,7 @@ const FINDING_RULES: Array<{
       /\b(run|execute)\b.{0,40}\b(command|shell|terminal|script|rm -rf|curl|wget)\b/i,
       /\b(delete|remove|overwrite|modify)\b.{0,50}\b(files?|database|repo|repository|messages?|emails?)/i,
       /\b(send|forward|email|post|upload|push|commit|deploy)\b.{0,80}\b(without asking|silently|automatically|now)\b/i,
+      /\b(?:send|forward|email|upload)\b.{0,80}\b(?:externally|outside|attacker|third party|confidential)\b/i,
       /\bcall\b.{0,30}\b(tool|function|api)\b/i,
     ],
   },
@@ -78,6 +83,8 @@ const FINDING_RULES: Array<{
       /\bDAN\b/,
       /act as\b.{0,40}\b(unrestricted|uncensored|developer mode|admin|root|system)\b/i,
       /pretend (you are|to be)\b.{0,40}\b(unrestricted|uncensored|admin|root|system)\b/i,
+      /\b(?:enter|enable|switch to)\b.{0,30}\b(?:unrestricted|developer|god|unsafe)\s+mode\b/i,
+      /pretend\b.{0,60}\b(?:safety|security|system|developer)\s+(?:policies|rules|instructions)\b.{0,30}\b(?:do not|don't|no longer)\s+apply/i,
     ],
   },
   {
@@ -89,6 +96,7 @@ const FINDING_RULES: Array<{
       /###\s*(system|developer|instruction|assistant)/i,
       /<!--[\s\S]{0,200}(ignore|system|instruction|prompt)[\s\S]{0,200}-->/i,
       /end of (message|email|document|prompt)\s*[-—]+\s*(system|assistant|developer)/i,
+      /\b(?:hidden|embedded|base64|encoded)\b.{0,50}\b(?:instruction|prompt|payload)\b.{0,50}\b(?:decode|obey|execute|follow)\b/i,
     ],
   },
 ];
@@ -100,7 +108,7 @@ function uniqueEvidence(matches: string[]) {
 function isBenignToolGuard(label: string, context: string) {
   return (
     label === "Tool abuse attempt" &&
-    /\b(?:do not|don't|never|without approval,? do not)\b.{0,30}\b(?:send|run|execute|call|upload|delete|modify|post|email|deploy|commit)\b/i.test(
+    /\b(?:do not|don't|never|without approval,? do not)\b.{0,8}\b(?:send|run|execute|call|upload|delete|modify|post|email|deploy|commit)\b/i.test(
       context
     )
   );
@@ -163,7 +171,16 @@ export function analyzeAgentFirewall(text: string): AgentFirewallResult {
   const redCount = findings.filter((finding) => finding.severity === "red").length;
   const amberCount = findings.filter((finding) => finding.severity === "amber").length;
   const score = Math.min(100, redCount * 34 + amberCount * 18);
-  const verdict: AgentFirewallVerdict = redCount >= 2 || score >= 70 ? "block" : findings.length ? "isolate" : "pass";
+  const directHighRisk =
+    findings.some((finding) => finding.label === "Tool abuse attempt") ||
+    (findings.some((finding) => finding.label === "Data exfiltration") &&
+      /\b(?:print|show|reveal|send|dump|exfiltrate|leak|upload)\b/i.test(text)) ||
+    (findings.some((finding) => finding.label === "Jailbreak or roleplay") &&
+      /\b(?:unrestricted|jailbreak|policies no longer apply|rules no longer apply)\b/i.test(text)) ||
+    (findings.some((finding) => finding.label === "Instruction override") &&
+      /\b(?:classify|mark|label|treat)\b.{0,30}\b(?:as )?safe\b/i.test(text));
+  const verdict: AgentFirewallVerdict =
+    redCount >= 2 || score >= 70 || directHighRisk ? "block" : findings.length ? "isolate" : "pass";
 
   const title =
     verdict === "block"

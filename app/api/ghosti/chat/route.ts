@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const limit = rateLimit(rateLimitKey(request, "ghosti-chat"), 20, 60_000);
+    const limit = await rateLimit(rateLimitKey(request, "ghosti-chat"), 20, 60_000);
     if (!limit.ok) {
       return Response.json(
         { error: "Too many Ghosti messages. Try again shortly." },

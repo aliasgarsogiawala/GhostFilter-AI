@@ -19,9 +19,9 @@ export interface ScamEnsembleResult {
 }
 
 const MONEY_OR_CODE_RE =
-  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|rent|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|code|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|rent|payment|fee|refund|crypto|bitcoin|btc|usdt|gift cards?|gift card codes?|otp|code|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
 
-const PAYMENT_VERB_RE = /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward|connect|enter|submit)\b/i;
+const PAYMENT_VERB_RE = /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|buy|buying|purchase|share|tell|forward|connect|enter|submit)\b/i;
 
 const TRUST_CLAIM_RE =
   /\b(?:i\s*(?:am|'?m)|im|this\s+is|it\s+is)\s+(?:really\s+|actually\s+)?(?:the\s+)?(?:real|official|verified)\s+[a-z][a-z'-]*(?:\s+[a-z][a-z'-]*){0,4}/i;
@@ -30,7 +30,7 @@ const PRESSURE_RE =
   /\b(?:urgent|immediately|right now|asap|last chance|limited time|before it expires|account locked|suspended|final warning|don't tell anyone|keep this private)\b/i;
 
 const PRIZE_CRYPTO_JOB_RE =
-  /\b(?:congratulations|winner|won|prize|airdrop|free\s+(?:nitro|iphone|gift|reward)|nitro\s+(?:drop|gift)|gift\s*card|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
+  /\b(?:congratulations|winner|won|prize|airdrop|free\s+(?:nitro|iphone|gift|reward)|nitro\s+(?:drop|gift)|gift\s*cards?|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
 
 const SUPPORT_IMPERSONATION_RE =
   /\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank|support|admin|security)\b.{0,35}\b(?:support|security|team|admin|official|verification|helpdesk|copyright|appeal)\b|\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank)\s+(?:support|copyright|appeal)\b/i;
@@ -41,6 +41,8 @@ const ACCOUNT_SECURITY_RE =
 const URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
 const PASSWORD_REQUEST_RE = /\b(?:send|share|tell|reply with|enter|submit)\b.{0,50}\b(?:password|passcode|login|credentials?)\b|\b(?:password|passcode|login|credentials?)\b.{0,50}\b(?:send|share|tell|reply|enter|submit)\b/i;
 const STRONG_SECRET_RE = /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed|password|passcode|credentials?)\b/i;
+const SERVICE_DISCONNECT_RE =
+  /\b(?:electricity|power|mobile|internet|gas|water|service)\b.{0,60}\b(?:disconnect(?:ed|ion)?|suspend(?:ed)?|restore|overdue)\b|\b(?:disconnect(?:ed|ion)?|suspend(?:ed)?)\b.{0,60}\b(?:electricity|power|mobile|internet|gas|water|service)\b/i;
 
 function clampScore(score: number) {
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -78,6 +80,7 @@ export function analyzeScamEnsemble(
   const hasUrl = URL_RE.test(text);
   const passwordRequest = PASSWORD_REQUEST_RE.test(text);
   const secretCredentialRequest = STRONG_SECRET_RE.test(text);
+  const serviceDisconnect = SERVICE_DISCONNECT_RE.test(text);
   const forensicHit = !!opts.forensics?.indicators.some((indicator) => indicator.severity === "red");
 
   addLayer(layers, {
@@ -171,6 +174,21 @@ export function analyzeScamEnsemble(
     });
   }
 
+  if (serviceDisconnect) {
+    const phrase = text.match(SERVICE_DISCONNECT_RE)?.[0] ?? "service disconnection threat";
+    addLayer(layers, {
+      label: "Utility/service disconnection lure",
+      score: hasUrl || paymentLike ? 90 : 70,
+      evidence: phrase,
+      explanation: "The message threatens an essential service interruption to force an urgent payment or link visit.",
+    });
+    flaggedPhrases.push({
+      phrase,
+      reason: "Unexpected disconnection threats should be verified through the provider's official app or number.",
+      severity: hasUrl || paymentLike ? "red" : "amber",
+    });
+  }
+
   if (passwordRequest) {
     const phrase = text.match(PASSWORD_REQUEST_RE)?.[0] ?? "password or credential request";
     addLayer(layers, {
@@ -214,6 +232,7 @@ export function analyzeScamEnsemble(
     (paymentLike && secretCredentialRequest) ||
     (prizeCryptoJob && hasUrl) ||
     (accountSecurity && hasUrl) ||
+    (serviceDisconnect && (hasUrl || paymentLike)) ||
     forensicHit;
   const needsReview = hardScam || score >= 38 || paymentLike || trustClaim;
 

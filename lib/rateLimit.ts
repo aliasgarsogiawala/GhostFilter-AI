@@ -18,7 +18,7 @@ function prune(now: number) {
   }
 }
 
-export function rateLimit(key: string, limit: number, windowMs: number) {
+function memoryRateLimit(key: string, limit: number, windowMs: number) {
   const now = Date.now();
   if (buckets.size >= MAX_BUCKETS) prune(now);
   const entry = buckets.get(key);
@@ -31,6 +31,37 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
   }
   entry.count += 1;
   return { ok: true, remaining: limit - entry.count, resetAt: entry.resetAt };
+}
+
+export async function rateLimit(key: string, limit: number, windowMs: number) {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return memoryRateLimit(key, limit, windowMs);
+
+  const script =
+    "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('PEXPIRE',KEYS[1],ARGV[1]) end; return {n,redis.call('PTTL',KEYS[1])}";
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(["EVAL", script, 1, key, windowMs]),
+      cache: "no-store",
+    });
+    if (!response.ok) return memoryRateLimit(key, limit, windowMs);
+    const payload = (await response.json()) as { result?: [number, number] };
+    const count = Number(payload.result?.[0] ?? 1);
+    const ttl = Math.max(1, Number(payload.result?.[1] ?? windowMs));
+    return {
+      ok: count <= limit,
+      remaining: Math.max(0, limit - count),
+      resetAt: Date.now() + ttl,
+    };
+  } catch {
+    return memoryRateLimit(key, limit, windowMs);
+  }
 }
 
 export function rateLimitKey(request: Request, scope: string) {

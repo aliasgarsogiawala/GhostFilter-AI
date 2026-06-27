@@ -36,6 +36,15 @@ for (const name of recommended) {
 if (!process.env.GHOSTFILTER_API_KEY?.trim()) {
   console.warn("OPEN GHOSTFILTER_API_KEY: firewall API will rely on rate limiting only");
 }
+if (!process.env.UPSTASH_REDIS_REST_URL?.trim() || !process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) {
+  console.warn("LOCAL RATE LIMIT: configure Upstash REST credentials for multi-instance enforcement");
+}
+if (!process.env.GOOGLE_CLIENT_ID?.trim() && !process.env.GITHUB_CLIENT_ID?.trim()) {
+  console.warn("ACCESS-CODE AUTH ONLY: configure Google or GitHub for verified user identity");
+}
+if (/localhost|127\.0\.0\.1/i.test(process.env.OLLAMA_BASE_URL ?? "")) {
+  console.warn("LOCAL OLLAMA: production Ghosti will use deterministic fallback unless Ollama is hosted");
+}
 
 if (missing.length || weak.length || localUrls.length || developmentConvex) {
   console.error("\nProduction environment check failed.");

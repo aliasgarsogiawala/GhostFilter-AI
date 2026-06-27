@@ -103,13 +103,13 @@ const IDENTITY_CLAIM_RE =
 const TRUST_CLAIM_RE =
   /\b(?:i\s*(?:am|'?m)|im|this\s+is|it\s+is)\s+(?:really\s+|actually\s+)?(?:the\s+)?(?:real|official|verified)\s+[a-z][a-z'-]*(?:\s+[a-z][a-z'-]*){0,4}/i;
 const MONEY_OR_CODE_RE =
-  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|rent|payment|refund|crypto|bitcoin|btc|usdt|gift cards?|otp|code|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
+  /(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|rent|payment|fee|refund|crypto|bitcoin|btc|usdt|gift cards?|gift card codes?|otp|code|one[-\s]?time code|verification code|pin|upi pin|seed phrase|recovery phrase|wallet seed)\b)/i;
 const PAYMENT_VERB_RE =
-  /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|share|tell|forward|connect|enter|submit)\b/i;
+  /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend|buy|buying|purchase|share|tell|forward|connect|enter|submit)\b/i;
 const PRESSURE_RE =
   /\b(?:urgent|immediately|right now|asap|last chance|limited time|before it expires|account locked|suspended|final warning|don't tell anyone|keep this private)\b/i;
 const PRIZE_CRYPTO_JOB_RE =
-  /\b(?:congratulations|winner|won|prize|airdrop|free\s+(?:nitro|iphone|gift|reward)|nitro\s+(?:drop|gift)|gift\s*card|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
+  /\b(?:congratulations|winner|won|prize|airdrop|free\s+(?:nitro|iphone|gift|reward)|nitro\s+(?:drop|gift)|gift\s*cards?|crypto|bitcoin|investment|double your money|work from home|easy income|guaranteed returns?)\b/i;
 const SUPPORT_IMPERSONATION_RE =
   /\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank|support|admin|security)\b.{0,35}\b(?:support|security|team|admin|official|verification|helpdesk|copyright|appeal)\b|\b(?:instagram|meta|facebook|whatsapp|telegram|discord|sbi|hdfc|icici|axis|bank)\s+(?:support|copyright|appeal)\b/i;
 const ACCOUNT_SECURITY_RE =
@@ -118,6 +118,8 @@ const HAS_URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
 const PASSWORD_REQUEST_RE = /\b(?:send|share|tell|reply with|enter|submit)\b.{0,50}\b(?:password|passcode|login|credentials?)\b|\b(?:password|passcode|login|credentials?)\b.{0,50}\b(?:send|share|tell|reply|enter|submit)\b/i;
 const SECRET_CREDENTIAL_RE =
   /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed|password|passcode|credentials?)\b/i;
+const SERVICE_DISCONNECT_RE =
+  /\b(?:electricity|power|mobile|internet|gas|water|service)\b.{0,60}\b(?:disconnect(?:ed|ion)?|suspend(?:ed)?|restore|overdue)\b|\b(?:disconnect(?:ed|ion)?|suspend(?:ed)?)\b.{0,60}\b(?:electricity|power|mobile|internet|gas|water|service)\b/i;
 // Small subset of lib/promptInjection.ts — language aimed at manipulating an AI reviewer
 // embedded inside the very content being scanned (itself a strong scam/abuse signal).
 const AI_MANIPULATION_RE = [
@@ -164,6 +166,7 @@ export function checkScam(input: string): ProtectResult {
   const hasUrl = HAS_URL_RE.test(text);
   const passwordRequest = PASSWORD_REQUEST_RE.test(text);
   const secretCredentialRequest = SECRET_CREDENTIAL_RE.test(text);
+  const serviceDisconnect = SERVICE_DISCONNECT_RE.test(text);
   const aiManipulation = AI_MANIPULATION_RE.some((re) => re.test(text));
 
   if (paymentLike) {
@@ -194,6 +197,14 @@ export function checkScam(input: string): ProtectResult {
     layers.push({ label: "Password or credential request", score: 96, evidence: text.match(PASSWORD_REQUEST_RE)?.[0] ?? "password or credential request" });
     categories.push("credential-request");
   }
+  if (serviceDisconnect) {
+    layers.push({
+      label: "Utility/service disconnection lure",
+      score: hasUrl || paymentLike ? 90 : 70,
+      evidence: text.match(SERVICE_DISCONNECT_RE)?.[0] ?? "service disconnection threat",
+    });
+    categories.push("service-disconnection-threat");
+  }
   if (aiManipulation) {
     layers.push({ label: "AI manipulation language", score: 78, evidence: "language aimed at manipulating an automated reviewer" });
     categories.push("ai-manipulation-language");
@@ -207,9 +218,10 @@ export function checkScam(input: string): ProtectResult {
     passwordRequest ||
     (paymentLike && secretCredentialRequest) ||
     (prizeCryptoJob && hasUrl) ||
-    (accountSecurity && hasUrl);
+    (accountSecurity && hasUrl) ||
+    (serviceDisconnect && (hasUrl || paymentLike));
 
-  const verdict: ProtectResult["verdict"] = hardScam || score >= 72 ? "dangerous" : score >= 38 || paymentLike ? "suspicious" : "safe";
+  const verdict: ProtectResult["verdict"] = hardScam || score >= 72 ? "dangerous" : score >= 45 || paymentLike ? "suspicious" : "safe";
 
   const reasons = layers
     .filter((layer) => layer.label !== "Statistical scam classifier" || layers.length === 1)

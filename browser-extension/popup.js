@@ -1,4 +1,5 @@
 const apiBaseInput = document.getElementById("apiBase");
+const apiKeyInput = document.getElementById("apiKey");
 const scanSelectionButton = document.getElementById("scanSelection");
 const scanPageButton = document.getElementById("scanPage");
 const copyButton = document.getElementById("copy");
@@ -13,12 +14,26 @@ const ghostiAdviceEl = document.getElementById("ghostiAdvice");
 const scorePillEl = document.getElementById("scorePill");
 const actionPillEl = document.getElementById("actionPill");
 
-chrome.storage.sync.get(["apiBase"], (items) => {
+chrome.storage.local.get(["apiBase", "apiKey"], (items) => {
   if (items.apiBase) apiBaseInput.value = items.apiBase;
+  if (items.apiKey) apiKeyInput.value = items.apiKey;
 });
 
-apiBaseInput.addEventListener("change", () => {
-  chrome.storage.sync.set({ apiBase: apiBaseInput.value.trim() });
+apiBaseInput.addEventListener("change", async () => {
+  const apiBase = apiBaseInput.value.trim().replace(/\/$/, "");
+  try {
+    const origin = new URL(apiBase).origin;
+    const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
+    if (!granted) throw new Error("Permission was not granted for this API origin.");
+    await chrome.storage.local.set({ apiBase });
+    statusEl.textContent = "API origin saved.";
+  } catch (error) {
+    statusEl.textContent = error instanceof Error ? error.message : "Invalid API URL.";
+  }
+});
+
+apiKeyInput.addEventListener("change", async () => {
+  await chrome.storage.local.set({ apiKey: apiKeyInput.value.trim() });
 });
 
 async function selectedTextFromActiveTab() {
@@ -66,9 +81,13 @@ async function runScan(getText, label) {
     if (!content) throw new Error(label === "selection" ? "Highlight some webpage text first." : "This page did not expose readable text.");
 
     const apiBase = apiBaseInput.value.trim().replace(/\/$/, "");
+    const apiKey = apiKeyInput.value.trim();
     const res = await fetch(`${apiBase}/api/ghostgpt/firewall`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       body: JSON.stringify({ content }),
     });
     const data = await res.json();

@@ -48,3 +48,6 @@ http://localhost:3000
 ```
 
 Change the field in the popup when testing against a deployed app.
+Chrome will ask for access only to that deployed API origin. If the deployment uses
+`GHOSTFILTER_API_KEY`, enter the same value in the popup's firewall API key field.
+Configuration is stored in local extension storage and is not synced between browsers.

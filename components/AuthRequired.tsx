@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
-import { LockKeyhole, ShieldCheck } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { getProviders, signIn } from "next-auth/react";
+import { Code2, LockKeyhole, ShieldCheck } from "lucide-react";
 
 export function AuthRequired({ title = "Sign in to GhostFilter" }: { title?: string }) {
   const [name, setName] = useState("");
@@ -10,6 +10,13 @@ export function AuthRequired({ title = "Sign in to GhostFilter" }: { title?: str
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [oauthProviders, setOauthProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    getProviders().then((available) => {
+      setOauthProviders(Object.keys(available ?? {}).filter((id) => id !== "credentials"));
+    });
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,6 +47,27 @@ export function AuthRequired({ title = "Sign in to GhostFilter" }: { title?: str
               </p>
             </div>
           </div>
+
+          {oauthProviders.length > 0 && (
+            <div className="mt-5 grid gap-2">
+              {oauthProviders.map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  onClick={() => signIn(provider, { callbackUrl: "/dashboard" })}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--line-strong)] bg-[var(--input)] text-xs font-semibold capitalize text-zinc-200"
+                >
+                  {provider === "github" ? <Code2 className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                  Continue with {provider}
+                </button>
+              ))}
+              <div className="flex items-center gap-3 py-1 text-[10px] uppercase text-zinc-600">
+                <span className="h-px flex-1 bg-[var(--line)]" />
+                Judge access
+                <span className="h-px flex-1 bg-[var(--line)]" />
+              </div>
+            </div>
+          )}
 
           <label className="mt-5 block text-[11px] font-semibold text-zinc-400">
             Name

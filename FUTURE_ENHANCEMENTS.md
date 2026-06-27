@@ -4,7 +4,7 @@ These items are intentionally outside the hackathon production scope. They shoul
 
 ## Production identity
 
-- Replace the shared hackathon access code with email magic links, passkeys, or trusted OAuth login.
+- Add email magic links or passkeys alongside the shipped Google/GitHub OAuth login.
 - Add account recovery, session revocation, and an admin-controlled judge/demo tenant.
 - Move Convex authorization to first-class verified identity claims when the chosen auth integration is finalized.
 
@@ -36,13 +36,13 @@ These items are intentionally outside the hackathon production scope. They shoul
 ## Platform integrations
 
 - Complete and validate Outlook against a production Microsoft tenant.
-- Rebuild the browser extension around authenticated, least-privilege API access.
+- Publish the least-privilege extension through browser stores and replace the shared API key with per-user authorization.
 - Add Discord, Telegram, and enterprise webhook ingestion where platform policies permit it.
 - Add agent-framework adapters for common tool and retrieval pipelines.
 
 ## Reliability and operations
 
-- Replace in-memory rate limiting with Redis or another shared limiter.
+- Provision shared Upstash rate limiting in every production region and monitor fallback activation.
 - Add structured logs, tracing, uptime checks, and alerting.
 - Add end-to-end tests for login, OAuth callbacks, scans, history, and deletion.
 - Add encrypted-token key rotation and re-encryption tooling.

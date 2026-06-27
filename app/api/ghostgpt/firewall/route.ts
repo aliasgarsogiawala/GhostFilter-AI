@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const limit = rateLimit(rateLimitKey(request, "ghostgpt-firewall"), 30, 60_000);
+    const limit = await rateLimit(rateLimitKey(request, "ghostgpt-firewall"), 30, 60_000);
     if (!limit.ok) {
       return Response.json(
         { error: "Too many firewall checks. Try again shortly." },

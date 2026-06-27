@@ -96,8 +96,10 @@ async function run() {
 
   const ollamaBase = (process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434").replace(/\/$/, "");
   const ollamaModel = process.env.GHOSTI_OLLAMA_MODEL ?? "qwen2.5:3b-instruct";
+  const ollamaApiKey = process.env.OLLAMA_API_KEY?.trim();
   try {
     const response = await fetch(`${ollamaBase}/api/tags`, {
+      headers: ollamaApiKey ? { Authorization: `Bearer ${ollamaApiKey}` } : undefined,
       signal: AbortSignal.timeout(3_000),
     });
     if (!response.ok) {
