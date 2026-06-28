@@ -2,6 +2,14 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  users: defineTable({
+    email: v.string(),
+    name: v.string(),
+    passwordHash: v.string(),
+    createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
+  }).index("by_email", ["email"]),
+
   // One row per account a browser has connected. Tokens are stripped from the
   // public list query and only used by server-side scan actions.
   connections: defineTable({

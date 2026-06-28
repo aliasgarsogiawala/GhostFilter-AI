@@ -142,6 +142,8 @@ Ghosti is an MVP chat assistant specialized for scam, phishing, account-security
 ## Security and privacy
 
 - NextAuth JWT sessions separate user histories and connected accounts.
+- Signup and login use Convex user records with unique emails and salted scrypt password hashes.
+- A private server-to-server secret prevents browsers from calling Convex password actions directly.
 - Signed owner tokens authorize browser-to-Convex reads, writes, scans, and deletion.
 - OAuth callbacks verify signed, expiring state and the active user session.
 - Google, GitHub, and Slack tokens are AES-256-GCM encrypted before Convex storage.
@@ -212,7 +214,7 @@ This fails if required production variables are absent, core secrets are weak, U
 2. Set all required variables listed in `README.md`.
 3. Set the same `OWNER_TOKEN_SECRET` in the Next.js and Convex environments.
 4. Configure production callback URLs for Google, GitHub, and Slack.
-5. Set a strong `DEMO_AUTH_PASSWORD` for judge access.
+5. Set the same strong `AUTH_SERVICE_SECRET` in the Next.js and Convex production environments.
 6. Run `npm run check:prod` and `npm run verify`.
 7. Deploy the Next.js application and smoke-test `/`, `/dashboard`, `/demo`, `/eval`, `/ghosti`, and `/docs`.
 
@@ -224,6 +226,6 @@ This fails if required production variables are absent, core secrets are weak, U
 - Ollama must run on infrastructure reachable by the deployed server to use the open model.
 - Binary PDF/image text extraction still relies on Gemini.
 - Multi-instance rate limiting requires the documented Upstash credentials; otherwise it degrades to process-local enforcement.
-- The credentials login is a hackathon access gate, not a consumer identity system.
+- Password reset and email verification are not included in the hackathon account flow.
 
 Longer-term product ideas and engineering work are tracked in `FUTURE_ENHANCEMENTS.md`.

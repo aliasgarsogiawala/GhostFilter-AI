@@ -4,7 +4,7 @@ These items are intentionally outside the hackathon production scope. They shoul
 
 ## Production identity
 
-- Add email magic links or passkeys alongside the shipped Google/GitHub OAuth login.
+- Add email verification, password reset, magic links, or passkeys alongside the shipped Convex email/password accounts.
 - Add account recovery, session revocation, and an admin-controlled judge/demo tenant.
 - Move Convex authorization to first-class verified identity claims when the chosen auth integration is finalized.
 

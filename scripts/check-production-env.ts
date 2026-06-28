@@ -8,7 +8,7 @@ const required = [
   "NEXT_PUBLIC_APP_URL",
   "NEXTAUTH_SECRET",
   "NEXTAUTH_URL",
-  "DEMO_AUTH_PASSWORD",
+  "AUTH_SERVICE_SECRET",
 ] as const;
 
 const recommended = [
@@ -18,7 +18,7 @@ const recommended = [
 ] as const;
 
 const missing = required.filter((name) => !process.env[name]?.trim());
-const weak = ["NEXTAUTH_SECRET", "DEMO_AUTH_PASSWORD"].filter(
+const weak = ["NEXTAUTH_SECRET", "AUTH_SERVICE_SECRET"].filter(
   (name) => process.env[name] && process.env[name]!.length < 24
 );
 const localUrls = ["NEXT_PUBLIC_APP_URL", "NEXTAUTH_URL"].filter((name) =>

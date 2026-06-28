@@ -1,59 +1,13 @@
-import { createHash } from "node:crypto";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GithubProvider from "next-auth/providers/github";
-import GoogleProvider from "next-auth/providers/google";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@/convex/_generated/api";
 import { createOwnerToken } from "./ownerToken";
 
-function stableUserId(email: string) {
-  return `user_${createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 32)}`;
-}
-
-const providers: NextAuthOptions["providers"] = [];
-
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  providers.push(
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    })
-  );
-}
-
-if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
-  providers.push(
-    GithubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    })
-  );
-}
-
-if (process.env.NODE_ENV !== "production" || process.env.DEMO_AUTH_PASSWORD) {
-  providers.push(
-    CredentialsProvider({
-      name: "Hackathon access code",
-      credentials: {
-        name: { label: "Name", type: "text" },
-        email: { label: "Email", type: "email" },
-        password: { label: "Access code", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = credentials?.email?.trim().toLowerCase();
-        if (!email || !email.includes("@")) return null;
-
-        const configuredPassword = process.env.DEMO_AUTH_PASSWORD;
-        if (process.env.NODE_ENV === "production" && !configuredPassword) return null;
-        if (configuredPassword && credentials?.password !== configuredPassword) return null;
-
-        return {
-          id: stableUserId(email),
-          email,
-          name: credentials?.name?.trim() || email.split("@")[0] || "GhostFilter user",
-        };
-      },
-    })
-  );
+function authServiceSecret() {
+  const secret = process.env.AUTH_SERVICE_SECRET;
+  if (!secret) throw new Error("AUTH_SERVICE_SECRET is not configured.");
+  return secret;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -64,7 +18,26 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/dashboard",
   },
-  providers,
+  providers: [
+    CredentialsProvider({
+      name: "GhostFilter account",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email?.trim().toLowerCase();
+        const password = credentials?.password ?? "";
+        if (!email || !password) return null;
+        const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+        return await convex.action(api.auth.login, {
+          serviceSecret: authServiceSecret(),
+          email,
+          password,
+        });
+      },
+    })
+  ],
   callbacks: {
     async jwt({ token, user }) {
       if (user?.id) token.sub = user.id;

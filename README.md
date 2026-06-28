@@ -316,7 +316,7 @@ Create `.env.local`.
 | `NEXT_PUBLIC_APP_URL` | Optional | Defaults to `http://localhost:3000`; set in production. |
 | `NEXTAUTH_SECRET` | Yes for auth | Secret used by NextAuth sessions, connected-app OAuth state signing, and token encryption fallback. Generate a strong random value for production. |
 | `NEXTAUTH_URL` | Production | Public app URL used by NextAuth in deployed environments. |
-| `DEMO_AUTH_PASSWORD` | Required in production | Hackathon access code. Production sign-in fails closed when it is absent. |
+| `AUTH_SERVICE_SECRET` | Yes for auth | Shared only between Next.js and Convex to protect server-side signup/login actions. Set the same strong value in both environments. |
 | `OAUTH_STATE_SECRET` | Optional | Separate HMAC secret for Google/GitHub/Slack connected-app OAuth state. Falls back to `NEXTAUTH_SECRET`. |
 | `OAUTH_TOKEN_ENCRYPTION_KEY` | Optional | Separate AES-GCM key source for stored connected-app tokens. Falls back to `NEXTAUTH_SECRET`. |
 | `OWNER_TOKEN_SECRET` | Optional | Separate HMAC secret for signed owner tokens passed from NextAuth to Convex. Falls back to `NEXTAUTH_SECRET`; set the same value in Convex env if you use this override. |

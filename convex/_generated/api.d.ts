@@ -9,6 +9,8 @@
  */
 
 import type * as agentScans from "../agentScans.js";
+import type * as auth from "../auth.js";
+import type * as authData from "../authData.js";
 import type * as connections from "../connections.js";
 import type * as drive from "../drive.js";
 import type * as github from "../github.js";
@@ -26,6 +28,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agentScans: typeof agentScans;
+  auth: typeof auth;
+  authData: typeof authData;
   connections: typeof connections;
   drive: typeof drive;
   github: typeof github;
