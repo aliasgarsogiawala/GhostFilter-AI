@@ -18,6 +18,30 @@ npm install ghostfilter-ai
 
 [Open the npm package](https://www.npmjs.com/package/ghostfilter-ai)
 
+## What the SDK is
+
+An SDK is a software development kit: code another developer imports into their own
+application. `ghostfilter-ai` packages GhostFilter's trained logistic-regression weights,
+scam rules, prompt-injection firewall, safe-context generator, and command guard as a
+small TypeScript/JavaScript library.
+
+The SDK does not embed the GhostFilter website. It gives developers callable functions:
+
+```ts
+import { ghostfilter } from "ghostfilter-ai";
+
+const result = await ghostfilter.protect({
+  input: externalEmailBody,
+  mode: "full",
+});
+
+if (result.verdict !== "safe") {
+  console.warn(result.reasons);
+}
+```
+
+Core checks run in the developer's Node.js process. No account or API key is required.
+
 ## What you can build
 
 - Add scam/phishing checks to your app
@@ -34,3 +58,9 @@ npm install ghostfilter-ai
 | `ghostfilter-ai` npm package | Local-first TypeScript SDK and CLI |
 | Ghosti Guard extension | Browser popup for selected text / whole-page agent-safety checks |
 | `/api/ghostgpt/firewall` | Agent firewall endpoint for deployed app integrations |
+
+## Trust model
+
+GhostFilter is a pre-processing safety layer, not an antivirus or a guarantee that content
+is safe. Applications should retain human approval for payments, credential changes,
+message sending, file deletion, and other consequential actions.

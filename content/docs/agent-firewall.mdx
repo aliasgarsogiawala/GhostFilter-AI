@@ -19,6 +19,7 @@ It detects:
 ```http
 POST /api/ghostgpt/firewall
 Content-Type: application/json
+Authorization: Bearer <GHOSTFILTER_API_KEY>
 ```
 
 ```json
@@ -44,3 +45,13 @@ Response:
 ## Safe context
 
 When content is risky, pass the `sanitizedContext` to GhostGPT instead of the raw text. This tells the agent to treat the content as untrusted data, not instructions.
+
+## API behavior
+
+- Maximum analyzed content: 20,000 characters
+- Empty input: HTTP `400`
+- Missing or wrong configured bearer key: HTTP `401`
+- Oversized request: HTTP `413`
+- Rate limit exceeded: HTTP `429` with `Retry-After`
+
+The bearer header is required only when the deployment sets `GHOSTFILTER_API_KEY`.

@@ -20,6 +20,7 @@ const result = await ghostfilter.protect({
 });
 
 console.log(result.verdict);
+console.log(result.score);
 console.log(result.reasons);
 console.log(result.recommendedAction);
 ```
@@ -35,3 +36,25 @@ Use `mode: "full"` when content may be risky for both a human and an AI agent.
 Use `mode: "scam"` for human-facing scam checks.
 
 Use `mode: "agent"` for prompt-injection / GhostGPT firewall checks.
+
+## Gate an AI-agent workflow
+
+```ts
+const externalContent = await loadSupportTicket();
+const result = await ghostfilter.protect({
+  input: externalContent,
+  mode: "agent",
+});
+
+if (result.verdict === "dangerous") {
+  throw new Error(`Blocked untrusted context: ${result.reasons.join("; ")}`);
+}
+
+const contextForModel =
+  result.verdict === "suspicious" ? result.safeContext : externalContent;
+
+await callYourModel(contextForModel);
+```
+
+The SDK detects and prepares safer context. It never calls `callYourModel` or executes
+actions on its own.

@@ -1,0 +1,52 @@
+---
+title: Permissions & Privacy
+description: What the SDK, CLI, browser extension, and connected sources can access.
+---
+
+## npm SDK
+
+By default, `ghostfilter-ai` has no external privileges. It does not automatically:
+
+- read files or directories
+- inspect shell history or environment variables
+- access email, browser tabs, or accounts
+- execute commands or tools
+- send scanned content over the network
+
+It analyzes only the string passed by the host application. Remote network use occurs
+only when `GHOSTFILTER_API_URL` is configured and `protect()` runs an agent check.
+
+## CLI
+
+The CLI reads only:
+
+- text supplied as a command argument
+- stdin supplied to `pipe`
+- the exact command string supplied to `guard`
+
+`guard` analyzes a command. It never executes that command.
+
+## Browser extension
+
+Ghosti Guard uses:
+
+- `activeTab` to inspect the current tab after a user action
+- `scripting` to extract selected or visible page text
+- local `storage` for API configuration
+- permission to the configured GhostFilter API origin
+
+It has no background crawler and does not continuously record browsing.
+
+## Connected sources
+
+Google, GitHub, and Slack connectors request read-only access for scanning. OAuth tokens
+are encrypted before storage. Public Convex queries strip token fields before returning
+connection metadata to the browser.
+
+## Authentication
+
+Web accounts are stored in Convex. Emails are normalized and unique. Passwords use
+per-user random salts and scrypt hashes; plaintext passwords are not stored.
+
+Results are safety guidance, not a guarantee. Consequential actions should retain
+independent verification and human approval.
