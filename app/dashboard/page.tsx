@@ -1302,11 +1302,23 @@ export default function GhostFilterDashboard() {
     setScanningKind(kind);
     setScanError(null);
     try {
-      if (kind === "inbox") await scanInbox({ ownerId, ownerToken, limit: scanDepth });
-      else if (kind === "drive") await scanDrive({ ownerId, ownerToken, limit: scanDepth });
-      else if (kind === "github") await scanGithub({ ownerId, ownerToken, limit: scanDepth });
-      else if (kind === "outlook") await scanOutlook({ ownerId, limit: scanDepth });
-      else await scanSlack({ ownerId, ownerToken, limit: scanDepth });
+      if (kind === "inbox") {
+        const result = await scanInbox({ ownerId, ownerToken, limit: scanDepth });
+        const summary = `${result.scanned} scanned, ${result.skipped} skipped`;
+        setActionStatus(result.failed ? `${summary}, ${result.failed} failed. Reconnect Google if failures continue.` : summary);
+      } else if (kind === "drive") {
+        const result = await scanDrive({ ownerId, ownerToken, limit: scanDepth });
+        setActionStatus(`${result.scanned} Drive files scanned`);
+      } else if (kind === "github") {
+        const result = await scanGithub({ ownerId, ownerToken, limit: scanDepth });
+        setActionStatus(`${result.scanned} GitHub items scanned`);
+      } else if (kind === "outlook") {
+        const result = await scanOutlook({ ownerId, limit: scanDepth });
+        setActionStatus(`${result.scanned} Outlook messages scanned`);
+      } else {
+        const result = await scanSlack({ ownerId, ownerToken, limit: scanDepth });
+        setActionStatus(`${result.scanned} Slack messages scanned`);
+      }
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Scan failed");
     } finally {

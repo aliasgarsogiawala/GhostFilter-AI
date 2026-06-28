@@ -124,7 +124,12 @@ const MAX_MESSAGES = 50;
 
 export const scanInbox = action({
   args: { ownerId: v.string(), ownerToken: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{ scanned: number; total: number }> => {
+  handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{
+    scanned: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  }> => {
     await assertOwnerToken(ownerId, ownerToken);
     const max = Math.min(MAX_MESSAGES, Math.max(1, limit ?? 25));
     const connection = await ctx.runQuery(internal.connections.getActiveGmail, { ownerId });
@@ -136,10 +141,14 @@ export const scanInbox = action({
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
     );
-    oauth2Client.setCredentials({
-      access_token: decryptSecret(connection.accessToken),
-      refresh_token: connection.refreshToken ? decryptSecret(connection.refreshToken) : undefined,
-    });
+    try {
+      oauth2Client.setCredentials({
+        access_token: decryptSecret(connection.accessToken),
+        refresh_token: connection.refreshToken ? decryptSecret(connection.refreshToken) : undefined,
+      });
+    } catch {
+      throw new Error("Google credentials need to be refreshed. Disconnect Google, reconnect it, then scan again.");
+    }
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
     const list = await gmail.users.messages.list({
@@ -150,66 +159,79 @@ export const scanInbox = action({
     const messages = list.data.messages ?? [];
 
     let scanned = 0;
+    let skipped = 0;
+    let failed = 0;
     for (const m of messages) {
-      if (!m.id) continue;
-
-      const existing = await ctx.runQuery(internal.scanResults.findByExternalId, {
-        connectionId: connection._id,
-        externalId: m.id,
-      });
-      if (existing) continue; // already scanned in a previous pass
-
-      const full = await gmail.users.messages.get({ userId: "me", id: m.id, format: "full" });
-      const { subject, body } = extractEmailContent(full.data);
-      if (!body.trim()) continue;
-
-      const headerList = (full.data.payload as { headers?: { name?: string | null; value?: string | null }[] })?.headers ?? [];
-
-      // Skip the ~10-20s urlscan screenshot during bulk inbox scans. VT domain
-      // checks (fast, synchronous) still run for every message. Real headers power the
-      // PhishTool-style forensics (Reply-To / Return-Path / SPF-DKIM-DMARC spoofing checks).
-      const result = await runPipeline(`Subject: ${subject}\n\n${body}`, {
-        captureScreenshot: false,
-        rawHeaders: rawHeadersFromList(headerList),
-      });
-
-      const attachmentIntel = await scanAttachments(gmail, m.id, full.data.payload ?? undefined);
-      const maliciousAttachment = attachmentIntel.find((a) => a.vtMalicious > 0);
-      if (maliciousAttachment) {
-        // A hash-confirmed malicious attachment overrides everything else. This
-        // isn't a judgment call the way a lookalike domain is, it's a direct hit.
-        result.verdict = "scam";
-        result.confidence = Math.max(result.confidence, 95);
-        result.signals = [...result.signals, { label: "Malicious Attachment", value: 100 }];
+      if (!m.id) {
+        skipped++;
+        continue;
       }
 
-      await ctx.runMutation(internal.scanResults.insert, {
-        ownerId,
-        connectionId: connection._id,
-        provider: "gmail",
-        externalId: m.id,
-        subject,
-        snippet: body.slice(0, 4000),
-        verdict: result.verdict,
-        mlScore: result.mlScore,
-        confidence: result.confidence,
-        summary: result.summary,
-        recommendation: result.recommendation,
-        flaggedPhrases: result.flaggedPhrases,
-        signals: result.signals,
-        aiReviewed: result.aiReviewed,
-        linkIntel: result.linkIntel,
-        screenshot: result.screenshot ?? undefined,
-        attachmentIntel: attachmentIntel.length ? attachmentIntel : undefined,
-        forensics: result.forensics ?? undefined,
-      });
-      scanned++;
+      try {
+        const existing = await ctx.runQuery(internal.scanResults.findByExternalId, {
+          connectionId: connection._id,
+          externalId: m.id,
+        });
+        if (existing) {
+          skipped++;
+          continue;
+        }
+
+        const full = await gmail.users.messages.get({ userId: "me", id: m.id, format: "full" });
+        const { subject, body } = extractEmailContent(full.data);
+        if (!body.trim()) {
+          skipped++;
+          continue;
+        }
+
+        const headerList = (full.data.payload as { headers?: { name?: string | null; value?: string | null }[] })?.headers ?? [];
+
+        // Bulk scans omit the slower screenshot capture. Reputation checks and
+        // header forensics still run for every readable message.
+        const result = await runPipeline(`Subject: ${subject}\n\n${body}`, {
+          captureScreenshot: false,
+          rawHeaders: rawHeadersFromList(headerList),
+        });
+
+        const attachmentIntel = await scanAttachments(gmail, m.id, full.data.payload ?? undefined);
+        const maliciousAttachment = attachmentIntel.find((a) => a.vtMalicious > 0);
+        if (maliciousAttachment) {
+          result.verdict = "scam";
+          result.confidence = Math.max(result.confidence, 95);
+          result.signals = [...result.signals, { label: "Malicious Attachment", value: 100 }];
+        }
+
+        await ctx.runMutation(internal.scanResults.insert, {
+          ownerId,
+          connectionId: connection._id,
+          provider: "gmail",
+          externalId: m.id,
+          subject,
+          snippet: body.slice(0, 4000),
+          verdict: result.verdict,
+          mlScore: result.mlScore,
+          confidence: result.confidence,
+          summary: result.summary,
+          recommendation: result.recommendation,
+          flaggedPhrases: result.flaggedPhrases,
+          signals: result.signals,
+          aiReviewed: result.aiReviewed,
+          linkIntel: result.linkIntel,
+          screenshot: result.screenshot ?? undefined,
+          attachmentIntel: attachmentIntel.length ? attachmentIntel : undefined,
+          forensics: result.forensics ?? undefined,
+        });
+        scanned++;
+      } catch (error) {
+        failed++;
+        console.error(`Gmail message scan failed for ${m.id}:`, error);
+      }
     }
 
     await ctx.runMutation(internal.connections.touchLastScanned, {
       connectionId: connection._id,
     });
 
-    return { scanned, total: messages.length };
+    return { scanned, skipped, failed, total: messages.length };
   },
 });
