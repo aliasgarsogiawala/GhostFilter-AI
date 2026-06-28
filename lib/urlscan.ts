@@ -54,6 +54,6 @@ export async function scanAndCapture(url: string, maxWaitMs = 20000): Promise<Ur
     }
     await new Promise((r) => setTimeout(r, 4000));
   }
-  // Still processing — return the links anyway, the screenshot will resolve shortly after.
+  // Still processing. Return the links anyway, the screenshot will resolve shortly after.
   return { url, uuid, resultUrl, screenshotUrl, ready: false };
 }

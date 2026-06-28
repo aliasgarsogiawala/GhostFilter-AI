@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       });
       if (userRes.ok) login = (await userRes.json()).login;
     } catch {
-      // non-fatal — the handle is just cosmetic
+      // Non-fatal because the handle is only used as a label.
     }
 
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);

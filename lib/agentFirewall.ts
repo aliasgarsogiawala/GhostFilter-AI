@@ -95,7 +95,7 @@ const FINDING_RULES: Array<{
       /\[\s*(system|developer|assistant|tool)\s*\]/i,
       /###\s*(system|developer|instruction|assistant)/i,
       /<!--[\s\S]{0,200}(ignore|system|instruction|prompt)[\s\S]{0,200}-->/i,
-      /end of (message|email|document|prompt)\s*[-—]+\s*(system|assistant|developer)/i,
+      /end of (message|email|document|prompt)\s*(?:-|\u2014)+\s*(system|assistant|developer)/i,
       /\b(?:hidden|embedded|base64|encoded)\b.{0,50}\b(?:instruction|prompt|payload)\b.{0,50}\b(?:decode|obey|execute|follow)\b/i,
     ],
   },

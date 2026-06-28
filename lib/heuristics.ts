@@ -88,14 +88,14 @@ export function lookalikeDomainCheck(hostname: string): LookalikeResult | null {
   for (const brand of KNOWN_BRAND_DOMAINS) {
     if (hostname === brand || hostname.endsWith(`.${brand}`)) continue; // legitimate or real subdomain
 
-    // brand name embedded as a deceptive subdomain/segment, e.g. paypal-secure.com, secure-paypal.verify.ru
+    // brand name embedded as a deceptive subdomain/segment, e.g. Paypal-secure.com, secure-paypal.verify.ru
     const brandRoot = brand.split(".")[0];
     if (hostname.includes(brandRoot)) {
       if (!best || best.distance > 1) best = { brand, distance: 1 };
       continue;
     }
 
-    // close character-level typo of the full domain, e.g. paypa1.com
+    // close character-level typo of the full domain, e.g. Paypa1.com
     if (Math.abs(hostname.length - brand.length) > 4) continue;
     const distance = levenshtein(hostname, brand);
     if (distance > 0 && distance <= 2) {
@@ -131,7 +131,7 @@ function isPrivateOrReservedIp(ip: string): boolean {
       lower.startsWith("fe80")
     );
   }
-  return true; // unresolvable / unknown — treat as unsafe
+  return true; // unresolvable / unknown. Treat as unsafe
 }
 
 interface ExpandResult {

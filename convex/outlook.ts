@@ -30,7 +30,7 @@ export const scanInbox = action({
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${connection.accessToken}` },
     });
-    if (!res.ok) throw new Error(`Outlook API error ${res.status} — try reconnecting Outlook.`);
+    if (!res.ok) throw new Error(`Outlook API error ${res.status}. Try reconnecting Outlook.`);
 
     const data = (await res.json()) as { value?: GraphMessage[] };
     const messages = data.value ?? [];

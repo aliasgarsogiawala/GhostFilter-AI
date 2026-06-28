@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "spellcheck": "npx cspell@9.2.1 --no-progress",
     "typecheck": "tsc --noEmit",
     "eval": "tsx scripts/evaluate.ts",
     "health:ai": "tsx scripts/ai-healthcheck.ts",

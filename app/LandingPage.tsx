@@ -319,7 +319,7 @@ export default function LandingPage() {
                 Scam detection + AI agent firewall
               </p>
               <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-[1.08] tracking-[-0.045em] text-zinc-100 sm:text-5xl lg:text-[58px]">
-                Check the message before you trust it — or before GhostGPT reads it.
+                Check the message before you trust it. Keep unsafe instructions away from GhostGPT.
               </h1>
               <p className="mt-6 max-w-lg text-[15px] leading-7 text-zinc-400">
                 GhostFilter protects people from scams and protects AI agents from prompt injection, jailbreaks, secret extraction, and unsafe tool-use instructions.
@@ -394,7 +394,7 @@ export default function LandingPage() {
                 </h2>
               </div>
               <p className="max-w-sm text-[11px] leading-6 text-zinc-500">
-                The scanner explains which layer fired, so the result feels inspectable instead of magical.
+                The scanner shows which checks found evidence, so you can see why it reached the verdict.
               </p>
             </div>
             <div className="grid gap-3 lg:grid-cols-3">

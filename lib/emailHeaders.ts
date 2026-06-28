@@ -149,7 +149,7 @@ export function parseEmailForensics(raw: string): EmailForensics {
     returnPathStatus = "bad";
     indicators.push({
       label: "Return-Path mismatch",
-      detail: `Bounce address (${returnPath.domain}) doesn't match the sender (${from.domain}) — a sign the From address may be spoofed.`,
+      detail: `Bounce address (${returnPath.domain}) doesn't match the sender (${from.domain}). The From address may be spoofed.`,
       severity: "red",
     });
   }
@@ -170,7 +170,7 @@ export function parseEmailForensics(raw: string): EmailForensics {
     if (r && r !== "pass" && r !== "neutral" && r !== "none") {
       indicators.push({
         label: `${mech} ${r}`,
-        detail: `${mech} authentication did not pass — the sender may not be who they claim.`,
+        detail: `${mech} authentication did not pass. The sender may not be who they claim.`,
         severity: mech === "DKIM" ? "amber" : "red",
       });
     }

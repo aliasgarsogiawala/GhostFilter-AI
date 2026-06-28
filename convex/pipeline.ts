@@ -89,7 +89,7 @@ export interface PipelineResult {
   mlBreakdown: ScamModelLayer[];
 }
 
-/** Checks domain reputation for up to the first 2 links — cheap, synchronous, no polling. */
+/** Checks domain reputation for up to the first 2 links. Cheap, synchronous, no polling. */
 async function gatherLinkIntel(links: LinkFinding[]): Promise<LinkIntel[]> {
   const targets = links.slice(0, 2);
   const results = await Promise.all(
@@ -126,7 +126,7 @@ function mergeFlaggedPhrases(
  * and the connected-account (Gmail) scanner. ML triage runs on every message
  * (cheap, local, no network); Gemini is only called when the ML score crosses
  * ML_REVIEW_THRESHOLD or a deterministic heuristic already found something
- * concrete (lookalike domain, blocked link expansion) — caps AI cost.
+ * concrete (lookalike domain, blocked link expansion). Caps AI cost.
  */
 export async function runPipeline(
   text: string,
@@ -154,7 +154,7 @@ export async function runPipeline(
   });
   const forensicHardHit = !!forensics?.indicators.some((i) => i.severity === "red");
 
-  // Threat-intel runs whenever the message has links — it's independent of the ML score, so
+  // Threat-intel runs whenever the message has links. It's independent of the ML score, so
   // links get a real VirusTotal reputation check (and, for single manual scans, a urlscan.io
   // sandbox screenshot) even when the text itself looks benign. A VT-flagged link then forces
   // escalation to the AI reviewer.
@@ -210,11 +210,11 @@ export async function runPipeline(
       socialEngineering
     );
   } catch {
-    // Gemini failed (missing key, rate limit, network) — degrade to a heuristic-only
+    // Gemini failed (missing key, rate limit, network). Degrade to a heuristic-only
     // verdict instead of crashing the whole analysis.
     const screenshot = await screenshotPromise;
     // Without the AI reviewer we MUST NOT call something a "scam" off the SMS-trained
-    // triage score alone — that's what flags legitimate newsletters. Only hard, corroborated
+    // triage score alone. That's what flags legitimate newsletters. Only hard, corroborated
     // signals (prompt-injection or a threat-intel-flagged link) justify "scam" here; everything
     // else that was escalated is at most "suspicious".
     const fallbackVerdict: "suspicious" | "scam" =
@@ -235,7 +235,7 @@ export async function runPipeline(
       mlScore,
       summary:
         fallbackVerdict === "scam"
-          ? "Concrete fraud indicators were found, but full AI review was temporarily unavailable — treat this as a scam."
+          ? "Concrete fraud indicators were found, but full AI review was temporarily unavailable. Treat this as a scam."
           : "Our AI reviewer was temporarily unavailable, so this is a cautious triage-only result, not a confirmed scam. Re-run the analysis in a moment for a full verdict.",
       recommendation: "Don't act on any request for money, passwords, or codes until you've verified it through an official channel you trust.",
       flaggedPhrases: mergeFlaggedPhrases(

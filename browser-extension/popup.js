@@ -72,7 +72,7 @@ function verdictCopy(firewall) {
 }
 
 async function runScan(getText, label) {
-  statusEl.textContent = `Scanning ${label}…`;
+  statusEl.textContent = `Scanning ${label}...`;
   resultEl.hidden = true;
   scanSelectionButton.disabled = true;
   scanPageButton.disabled = true;

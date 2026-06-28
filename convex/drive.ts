@@ -17,12 +17,12 @@ export const scanDrive = action({
   handler: async (ctx, { ownerId, ownerToken, limit }): Promise<{ scanned: number; total: number }> => {
     await assertOwnerToken(ownerId, ownerToken);
     const max = Math.min(MAX_FILES, Math.max(1, limit ?? 25));
-    // Reuses the existing Google (Gmail) connection — same OAuth, now with the drive.readonly
+    // Reuses the existing Google (Gmail) connection. Same OAuth, now with the drive.readonly
     // scope. Attackers share malicious Google Docs (phishing links) to bypass email filters,
     // so we scan files recently shared with the user.
     const connection = await ctx.runQuery(internal.connections.getActiveGmail, { ownerId });
     if (!connection) {
-      throw new Error("Connect Google (Gmail) first — Drive scanning reuses that connection.");
+      throw new Error("Connect Google (Gmail) first. Drive scanning reuses that connection.");
     }
 
     const oauth2Client = new google.auth.OAuth2(
@@ -44,7 +44,7 @@ export const scanDrive = action({
         fields: "files(id, name, mimeType, webViewLink, owners(displayName, emailAddress))",
       });
     } catch {
-      throw new Error("Drive API request failed — make sure the Drive API is enabled and you reconnected Google to grant Drive access.");
+      throw new Error("Drive API request failed. Make sure the Drive API is enabled and reconnect Google to grant Drive access.");
     }
 
     const files = list.data.files ?? [];
@@ -70,7 +70,7 @@ export const scanDrive = action({
           body = typeof dl.data === "string" ? dl.data : "";
         }
       } catch {
-        // can't read contents — fall back to filename-only scan
+        // can't read contents. Fall back to filename-only scan
       }
 
       const owner = f.owners?.[0];

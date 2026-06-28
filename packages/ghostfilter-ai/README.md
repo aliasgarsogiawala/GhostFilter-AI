@@ -1,7 +1,7 @@
 # ghostfilter-ai
 
-A safety firewall for humans **and** AI agents. It scans untrusted text — a DM, an email,
-a tool result, a piece of content an LLM is about to read — before anyone or anything
+A safety firewall for people **and** AI agents. It scans untrusted text such as a DM, email,
+tool result, or content an LLM is about to read before anyone or anything
 trusts it. GhostFilter is best known as a scam/phishing detector, but the same engine
 also catches the other side of the same problem: prompt injection and unsafe tool-use
 instructions aimed at an AI agent.
@@ -42,7 +42,7 @@ interface ProtectResult {
   mode: "scam" | "agent" | "full" | "command";
   reasons: string[];
   categories: string[];
-  safeContext?: string;       // present for agent/full — wrap untrusted content before an LLM sees it
+  safeContext?: string;       // present for agent/full; wrap untrusted content before an LLM sees it
   recommendedAction: string;
   raw?: unknown;               // underlying engine output, for advanced consumers
 }
@@ -65,7 +65,7 @@ All five are also available as named exports: `import { protect, checkScam, chec
 ```ts
 import { ghostfilter } from "ghostfilter-ai";
 
-const toolOutput = await fetchEmailBody(); // untrusted — came from outside your system
+const toolOutput = await fetchEmailBody(); // untrusted because it came from outside your system
 const firewall = await ghostfilter.checkAgentInjection(toolOutput);
 
 if (firewall.verdict !== "safe") {
@@ -88,7 +88,7 @@ if (check.verdict !== "safe") {
 ```
 
 `checkCommand` (and the CLI's `guard` subcommand) only ever inspects the exact string you
-hand it. This package never reads your shell history, dotfiles, or filesystem on its own —
+hand it. This package never reads your shell history, dotfiles, or filesystem on its own.
 terminal protection is explicit and opt-in.
 
 ## CLI
@@ -108,10 +108,10 @@ For one-off use without adding it to a project:
 npx --package ghostfilter-ai ghostfilter scan "Suspicious message"
 ```
 
-- `scan [--mode scam|agent|full] "<text>"` — checks the given text. Defaults to `full`.
-- `pipe [--mode scam|agent|full]` — same check, reading text from stdin.
-- `guard "<shell command>"` — checks a single command string for destructive/risky patterns.
-- Exit code `0` for a `safe` verdict, `1` for `suspicious` or `dangerous` — convenient in CI or pre-commit hooks.
+- `scan [--mode scam|agent|full] "<text>"`: checks the given text. Defaults to `full`.
+- `pipe [--mode scam|agent|full]`: runs the same check on text read from stdin.
+- `guard "<shell command>"`: checks a single command string for destructive or risky patterns.
+- Exit code `0` means safe. Exit code `1` means suspicious or dangerous, which is useful in CI or pre-commit hooks.
 
 ## Local-first, with optional API mode
 
@@ -132,7 +132,7 @@ timeout, rejected response, or missing config. Direct `checkAgentInjection`,
 ## Why this exists
 
 GhostFilter started as a scam/phishing analyzer for everyday messages. The same
-pattern — untrusted text trying to manipulate whoever reads it — shows up again wherever
+pattern, where untrusted text tries to manipulate whoever reads it, appears again wherever
 an AI agent reads emails, tickets, web pages, or tool output and might act on what it
 finds. This package packages that detection logic as a reusable safety layer for both
 audiences: humans deciding whether to trust a message, and agents deciding whether to

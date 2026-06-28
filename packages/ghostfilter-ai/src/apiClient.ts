@@ -1,7 +1,7 @@
 // Optional remote mode. If GHOSTFILTER_API_URL is set, agent-firewall checks call the
 // deployed GhostFilter app's /api/ghostgpt/firewall endpoint instead of running locally.
 // Any failure (no env var, network error, timeout, bad response) returns null and the
-// caller silently falls back to the local heuristics in agentFirewall.ts — the package
+// caller silently falls back to the local heuristics in agentFirewall.ts, so the package
 // always works without an API key.
 export interface ApiConfig {
   baseUrl: string;
@@ -23,8 +23,8 @@ interface RemoteFirewallResponse {
   sanitizedContext: string;
 }
 
-/** Calls the main app's agent-firewall endpoint. Returns null on any failure so the
- *  caller can fall back to the local checker — never throws. */
+/** Calls the main app's agent-firewall endpoint. Returns null on failure so the
+ * caller can fall back to the local checker. */
 export async function callAgentFirewallApi(content: string): Promise<RemoteFirewallResponse | null> {
   const config = getApiConfig();
   if (!config) return null;

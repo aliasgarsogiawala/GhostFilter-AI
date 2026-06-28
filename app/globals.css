@@ -12,13 +12,13 @@
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
 
-  /* Fixed accent (teal) — text & gauge stay this color across all themes. */
+  /* Fixed accent (teal). Text & gauge stay this color across all themes. */
   --accent: #1fe3ad;
   --accent-bright: #3eeec0;
   --accent-ink: #06231c;
   --accent-dim: #0c1a16;
 
-  /* Background palette — this is what the theme switcher changes. Default: Carbon. */
+  /* Background palette. This is what the theme switcher changes. Default: Carbon. */
   --ink: #0c0c10; /* page background */
   --panel: #121217; /* cards, header, surfaces */
   --input: #0e0e12; /* inset fields, bars */
@@ -131,7 +131,7 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Flat tiled dot texture — no color gradients, just a repeating raster pattern. */
+/* Flat tiled dot texture. No color gradients, just a repeating raster pattern. */
 .bg-dot-grid {
   background-color: var(--ink);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Ccircle cx='1.6' cy='1.6' r='1.6' fill='%23ffffff17'/%3E%3C/svg%3E");

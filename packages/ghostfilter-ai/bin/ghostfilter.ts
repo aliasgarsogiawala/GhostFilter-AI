@@ -60,7 +60,7 @@ async function readStdin(): Promise<string> {
 }
 
 function printUsage() {
-  console.log(`${COLORS.bold}ghostfilter${COLORS.reset} — safety firewall for humans and AI agents
+  console.log(`${COLORS.bold}ghostfilter${COLORS.reset} | safety firewall for people and AI agents
 
 Usage:
   ghostfilter scan [--mode scam|agent|full] "<text>"
@@ -73,7 +73,7 @@ Examples:
   echo "some untrusted text" | ghostfilter pipe --mode full
   ghostfilter guard "rm -rf node_modules"
 
-Env vars (optional — local heuristics are used when unset):
+Environment variables (optional; local checks are used when unset):
   GHOSTFILTER_API_URL   Base URL of a deployed GhostFilter app, used for the agent-firewall check.
   GHOSTFILTER_API_KEY   Bearer token sent with that request.`);
 }

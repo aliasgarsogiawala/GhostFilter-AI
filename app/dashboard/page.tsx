@@ -253,12 +253,12 @@ const MODE_COPY: Record<InputMode, { title: string; helper: string; placeholder:
   message: {
     title: "Paste a message",
     helper: "Include the sender and any links if possible.",
-    placeholder: "Paste an SMS, WhatsApp message, or direct message here…",
+    placeholder: "Paste an SMS, WhatsApp message, or direct message here...",
   },
   email: {
     title: "Paste an email",
     helper: "For the strongest check, include the sender, subject, body, and raw headers.",
-    placeholder: "Paste the email here, including its subject and sender…",
+    placeholder: "Paste the email here, including its subject and sender...",
   },
   link: {
     title: "Check a link",
@@ -410,7 +410,7 @@ function ghostiAdvice({
   }
 
   if (!result) {
-    return "Paste a message, email, link, or file and I’ll explain the risk in normal language — no security degree required.";
+    return "Paste a message, email, link, or file. I’ll explain the risk in plain language.";
   }
   if (mode === "action") return result.recommendation;
   if (mode === "reply") return verificationMessage(result);
@@ -452,7 +452,7 @@ const SAFETY_KIT = [
   },
 ] as const;
 
-// Channels where personal messages CAN'T be read by a web app (platform restriction) —
+// Channels where personal messages cannot be read by a web app because of platform restrictions.
 // users paste these in manually instead. Honest, and still genuinely useful.
 const MANUAL_CHANNELS = [
   { id: "sms", label: "SMS / Text", icon: Smartphone },
@@ -583,7 +583,7 @@ const CONNECTION_LANES = [
 ] as const;
 
 // ----------------------------------------------------------------------------
-// Threat gauge — 270° arc instrument with tick marks and a hard bezel ring.
+// Threat gauge. 270° arc instrument with tick marks and a hard bezel ring.
 // ----------------------------------------------------------------------------
 
 function useAnimatedNumber(target: number, durationMs = 700) {
@@ -678,15 +678,15 @@ function ThreatGauge({
             className="font-mono text-[64px] font-bold leading-none tabular-nums tracking-[-0.08em] sm:text-[76px]"
             style={{ color: displayColor }}
           >
-            {hasResult ? Math.round(animated) : "—"}
+            {hasResult ? Math.round(animated) : "--"}
             {hasResult && <span className="ml-2 text-2xl tracking-normal text-zinc-500">%</span>}
           </div>
         )}
           <p className="mt-2 text-[12px] text-zinc-400">
             {scanning
               ? context === "agent"
-                ? "Looking for instruction overrides, secret requests, jailbreaks, and unsafe tool calls…"
-                : "Looking for pressure tactics, unsafe links, and identity clues…"
+                ? "Looking for instruction overrides, secret requests, jailbreaks, and unsafe tool calls..."
+                : "Looking for pressure tactics, unsafe links, and identity clues..."
               : riskCopy}
           </p>
         </div>
@@ -719,7 +719,7 @@ function ThreatGauge({
   );
 }
 
-// Mouse-tracking 3D tilt wrapper — subtle perspective without visual noise.
+// Mouse-tracking 3D tilt wrapper. Subtle perspective without visual noise.
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const rawX = useMotionValue(0);
@@ -814,7 +814,7 @@ function SignalBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** Custom brand mark: a protective shield crossed by a scan-line with a center node —
+/** Custom brand mark: a protective shield crossed by a scan-line with a center node.
  *  "scanning shield". Animated scan sweep on the line for a subtle bit of life. */
 function GhostMark() {
   return (
@@ -933,7 +933,7 @@ function SectionLabel({
   );
 }
 
-/** Reads ?connect=success|error via the Next.js router (hydration-safe — no window access)
+/** Reads ?connect=success|error via the Next.js router (hydration-safe. No window access)
  *  and clears it from the URL once shown. */
 function ConnectBanner() {
   const params = useSearchParams();
@@ -958,14 +958,14 @@ function ConnectBanner() {
               : "border-[#ef4060] bg-[#1a0c10] text-[#ef4060]"
           }`}
         >
-          {banner === "success" ? "Gmail connected successfully." : "Connection failed — please try again."}
+          {banner === "success" ? "Gmail connected successfully." : "Connection failed. Please try again."}
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
-/** Rotated ink-stamp badge over the analyzed message — the verdict, made tangible. */
+/** Rotated ink-stamp badge over the analyzed message. The verdict, made tangible. */
 function VerdictStamp({ verdict }: { verdict: Verdict }) {
   const cfg = STAMP_CONFIG[verdict];
   return (
@@ -1373,7 +1373,7 @@ export default function GhostFilterDashboard() {
   const copyReport = async () => {
     if (!selected) return;
     const copied = await copyTextToClipboard(reportText(selected));
-    setActionStatus(copied ? "Report copied" : "Copy failed — use Download instead");
+    setActionStatus(copied ? "Report copied" : "Copy failed. Use Download instead.");
   };
 
   const downloadReport = () => {
@@ -1403,7 +1403,7 @@ export default function GhostFilterDashboard() {
   const copyVerification = async () => {
     if (!selected) return;
     const copied = await copyTextToClipboard(verificationMessage(selected));
-    setActionStatus(copied ? "Verification message copied" : "Copy failed — select and copy the message manually");
+    setActionStatus(copied ? "Verification message copied" : "Copy failed. Select and copy the message manually.");
   };
 
   const toggleSafetyAction = (index: number) => {
@@ -1426,7 +1426,7 @@ export default function GhostFilterDashboard() {
   const copySafeContext = async () => {
     if (!activeAgentResult) return;
     const copied = await copyTextToClipboard(activeAgentResult.sanitizedContext);
-    setActionStatus(copied ? "Safe GhostGPT context copied" : "Copy failed — select and copy manually");
+    setActionStatus(copied ? "Safe GhostGPT context copied" : "Copy failed. Select and copy it manually.");
   };
 
   const sendFeedback = async (expectedVerdict: Verdict) => {
@@ -1438,7 +1438,7 @@ export default function GhostFilterDashboard() {
       expectedVerdict,
     });
     setFeedbackSent(true);
-    setActionStatus("Thanks — your correction was saved");
+    setActionStatus("Thanks. Your correction was saved.");
   };
 
   const tone = selected ? verdictTone(selected.verdict) : "clear";
@@ -1518,7 +1518,7 @@ export default function GhostFilterDashboard() {
       </header>
 
       <main className="relative z-10 grid grid-cols-1 lg:h-[calc(100vh-73px)] lg:grid-cols-12 lg:overflow-hidden">
-        {/* ZONE A — Recent Scans */}
+        {/* ZONE A. Recent Scans */}
         <motion.section
           id="recent-scans-sidebar"
           initial={{ opacity: 0, y: 10 }}
@@ -1581,7 +1581,7 @@ export default function GhostFilterDashboard() {
                       <input
                         value={historySearch}
                         onChange={(event) => setHistorySearch(event.target.value)}
-                        placeholder="Search scans…"
+                        placeholder="Search scans..."
                         aria-label="Search recent scans"
                         className="h-9 w-full rounded-md border border-[var(--line)] bg-[var(--input)] pl-8 pr-3 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-[var(--accent)] focus:outline-none"
                       />
@@ -1950,7 +1950,7 @@ export default function GhostFilterDashboard() {
           </AnimatePresence>
         </motion.section>
 
-        {/* ZONE B — Analyzer */}
+        {/* ZONE B. Analyzer */}
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1959,7 +1959,7 @@ export default function GhostFilterDashboard() {
             historyOpen ? "lg:col-span-6" : "lg:col-span-8"
           }`}
         >
-          {/* Channels that can't be auto-connected (no API to read personal messages) —
+          {/* Channels that cannot be auto-connected because no API can read personal messages.
               honest manual-paste path instead of fake "connect" buttons. */}
           <div className="order-4 border-b border-[var(--line)] px-5 py-3">
             <p className="mb-2 text-[10px] leading-relaxed text-zinc-500">
@@ -2107,7 +2107,7 @@ export default function GhostFilterDashboard() {
                   }
                 }}
                 placeholder={
-                  sourceHint ? `Paste the ${sourceHint} message here…` : MODE_COPY[inputMode].placeholder
+                  sourceHint ? `Paste the ${sourceHint} message here...` : MODE_COPY[inputMode].placeholder
                 }
                 rows={inputMode === "link" ? 3 : 5}
                 aria-describedby="message-help"
@@ -2239,13 +2239,13 @@ export default function GhostFilterDashboard() {
                 <div className="flex min-h-[88px] flex-col items-center justify-center gap-1 text-center">
                   <ScanSearch className="h-5 w-5 text-zinc-700" />
                   <p className="text-zinc-600">
-                    Paste content or tap an example — your verdict appears here.
+                    Paste content or choose an example. Your verdict will appear here.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* PhishTool-style header forensics — shown when the analyzed item is a real email
+            {/* PhishTool-style header forensics. Shown when the analyzed item is a real email
                 (Gmail scan, or a pasted raw email with headers). */}
             {selected?.forensics && (
               <details className="group mt-4 rounded-md border border-[var(--line)] bg-[var(--input)]">
@@ -2308,7 +2308,7 @@ export default function GhostFilterDashboard() {
           </div>
         </motion.section>
 
-        {/* ZONE C — Result detail */}
+        {/* ZONE C. Result detail */}
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -2698,7 +2698,7 @@ export default function GhostFilterDashboard() {
                   <ImageIcon className="h-3 w-3" />
                   Safe page preview
                 </span>
-                {/* Always attempt the image — urlscan renders it within ~15-20s, so it may not
+                {/* Always attempt the image. Urlscan renders it within ~15-20s, so it may not
                     be ready the instant the scan returns, but resolves shortly after (and on any
                     later view of this result). If it isn't up yet, show a fallback note. */}
                 {/* eslint-disable-next-line @next/next/no-img-element -- urlscan image URLs are external and short-lived */}
@@ -2714,7 +2714,7 @@ export default function GhostFilterDashboard() {
                   }}
                 />
                 <p className="hidden text-[11px] text-zinc-600">
-                  Still rendering on urlscan.io — open the full report below, it&apos;ll be ready in a few seconds.
+                  The preview is still rendering on urlscan.io. Open the full report below or try again in a few seconds.
                 </p>
                 <a
                   href={selected.screenshot.resultUrl}
@@ -2794,7 +2794,7 @@ export default function GhostFilterDashboard() {
 
             <p className="rounded-md border border-[#f5a623]/40 bg-[#1a140a] px-3 py-2 text-[10px] leading-relaxed text-[#f5a623]">
               GhostFilter AI is in beta and can make mistakes. Treat results as guidance, not a
-              final ruling — always use your own judgment before acting on any message.
+              final ruling. Use your own judgment before acting on any message.
             </p>
 
             {gmailConnection && (

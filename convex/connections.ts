@@ -147,7 +147,7 @@ export const upsertSlack = mutation({
   },
 });
 
-// Public list — strips tokens before returning, never expose them to the client.
+// Public list. Strips tokens before returning, never expose them to the client.
 export const listForOwner = query({
   args: { ownerId: v.string(), ownerToken: v.string() },
   handler: async (ctx, { ownerId, ownerToken }) => {
@@ -179,7 +179,7 @@ export const disconnect = mutation({
   },
 });
 
-// Internal — used only by the convex/gmail.ts scan action, never exposed with tokens to the client.
+// Internal. Used only by the convex/gmail.ts scan action, never exposed with tokens to the client.
 export const getActiveGmail = internalQuery({
   args: { ownerId: v.string() },
   handler: async (ctx, { ownerId }) => {

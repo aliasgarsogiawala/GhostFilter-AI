@@ -5,7 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 const KEY = "gf_theme";
 const APPEARANCE_KEY = "gf_appearance";
 
-// Background themes — these change the page/surface palette, not the accent.
+// Background themes. These change the page/surface palette, not the accent.
 export const THEMES = [
   { id: "carbon", label: "Carbon", swatch: "#667085" },
   { id: "midnight", label: "Midnight", swatch: "#5270d7" },

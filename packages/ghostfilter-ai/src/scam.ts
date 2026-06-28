@@ -1,12 +1,12 @@
 // Scam / phishing detector. Vendored and trimmed from the main GhostFilter app's
 // lib/ml-classifier.ts + lib/features.ts + lib/socialEngineering.ts + lib/scamEnsemble.ts
-// so this package has zero runtime dependency on the Next.js/Convex app — it just needs
+// so this package has no runtime dependency on the Next.js or Convex app. It uses
 // the trained weights and the same deterministic feature/regex logic.
 import type { ProtectResult } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Trained logistic-regression weights (SMS Spam Collection + SpamAssassin corpus,
-// ~94% test accuracy — see the main repo's scripts/train-classifier.ts).
+// about 94% test accuracy; see the main repo's scripts/train-classifier.ts).
 // ---------------------------------------------------------------------------
 const ML_WEIGHTS = {
   vocab: [
@@ -92,7 +92,7 @@ function scoreMessage(text: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Regex evidence layers — vendored from lib/socialEngineering.ts + lib/scamEnsemble.ts.
+// Regex evidence layers vendored from lib/socialEngineering.ts and lib/scamEnsemble.ts.
 // ---------------------------------------------------------------------------
 const PAYMENT_REQUEST_RE =
   /\b(?:send|pay|transfer|wire|deposit|remit|give|loan|lend)\b.{0,45}(?:[$£€₹]\s*\d[\d,.]*|\d[\d,.]*\s*(?:rs\.?|inr|rupees?|dollars?|usd|euros?|eur|pounds?|gbp|dirhams?|aed|yen|jpy)\b|\b(?:money|cash|payment|crypto|bitcoin|btc|usdt|gift cards?)\b)/i;
@@ -120,7 +120,7 @@ const SECRET_CREDENTIAL_RE =
   /\b(?:otp|one[-\s]?time code|verification code|upi pin|pin|seed phrase|recovery phrase|wallet seed|password|passcode|credentials?)\b/i;
 const SERVICE_DISCONNECT_RE =
   /\b(?:electricity|power|mobile|internet|gas|water|service)\b.{0,60}\b(?:disconnect(?:ed|ion)?|suspend(?:ed)?|restore|overdue)\b|\b(?:disconnect(?:ed|ion)?|suspend(?:ed)?)\b.{0,60}\b(?:electricity|power|mobile|internet|gas|water|service)\b/i;
-// Small subset of lib/promptInjection.ts — language aimed at manipulating an AI reviewer
+// Small subset of lib/promptInjection.ts for language aimed at manipulating an AI reviewer
 // embedded inside the very content being scanned (itself a strong scam/abuse signal).
 const AI_MANIPULATION_RE = [
   /ignore (all|any|the)?\s*(previous|prior|above)?\s*instructions?/i,

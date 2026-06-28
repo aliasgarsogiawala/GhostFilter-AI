@@ -1,5 +1,5 @@
 // Orchestrates protect(): picks local vs. API for the agent-firewall check, always runs
-// the scam check locally (no public REST scam endpoint exists yet — see README), and
+// the scam check locally (there is no public scam REST endpoint), and
 // merges both into one result for mode "full".
 import { checkScam } from "./scam.js";
 import { checkAgentInjection } from "./agentFirewall.js";
@@ -51,7 +51,7 @@ export async function protect({ input, mode = "full" }: ProtectOptions): Promise
       verdict: "safe",
       score: 0,
       mode: mode as ProtectMode,
-      reasons: ["Empty input — nothing to check."],
+      reasons: ["Empty input. Nothing to check."],
       categories: [],
       recommendedAction: "Provide text to check.",
     };

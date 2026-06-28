@@ -1,7 +1,7 @@
 /** The kind of protection to run. "full" runs both the scam and agent-firewall checks. */
 export type ProtectMode = "scam" | "agent" | "full";
 
-/** mode tag attached to a result — includes "command" for checkCommand(), which isn't
+/** mode tag attached to a result. Includes "command" for checkCommand(), which isn't
  *  reachable through protect() but reuses the same result shape for consistent CLI output. */
 export type ResultMode = ProtectMode | "command";
 

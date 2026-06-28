@@ -3,8 +3,8 @@
 //
 // Trains a logistic regression (hand-rolled gradient descent, no ML deps) on a
 // combined corpus so it generalizes beyond SMS:
-//   - SMS Spam Collection (scripts/data/sms-spam.csv)           — short text messages
-//   - SpamAssassin public corpus (scripts/data/spamassassin/)   — real emails, incl.
+//   - SMS Spam Collection (scripts/data/sms-spam.csv)          . Short text messages
+//   - SpamAssassin public corpus (scripts/data/spamassassin/)  . Real emails, incl.
 //     hard_ham = legitimate-but-promotional newsletters/marketing (the false-positive
 //     class that an SMS-only model gets wrong).
 // The SpamAssassin corpus is gitignored; re-download it with:
@@ -25,7 +25,7 @@ const OUTPUT_PATH = join(__dirname, "..", "lib", "ml-weights.json");
 const SA_FOLDERS: { dir: string; label: 0 | 1 }[] = [
   { dir: "easy_ham", label: 0 },
   { dir: "easy_ham_2", label: 0 },
-  { dir: "hard_ham", label: 0 }, // legit but promotional — teaches the model not to over-flag
+  { dir: "hard_ham", label: 0 }, // legit but promotional. Teaches the model not to over-flag
   { dir: "spam", label: 1 },
   { dir: "spam_2", label: 1 },
 ];
@@ -104,7 +104,7 @@ function parseEmail(raw: string): string {
 function loadEmails(): Row[] {
   if (!existsSync(SPAMASSASSIN_DIR)) {
     console.warn(
-      `\n⚠ SpamAssassin corpus not found at ${SPAMASSASSIN_DIR} — training on SMS only.\n` +
+      `\n⚠ SpamAssassin corpus not found at ${SPAMASSASSIN_DIR}. Training on SMS only.\n` +
         `  Run scripts/download-corpus.sh to fetch it for a much better model.\n`
     );
     return [];
@@ -304,7 +304,7 @@ function main() {
   console.log("Train:", trainMetrics);
   console.log("Test:", testMetrics);
 
-  // Per-slice test metrics — especially the legitimate-email recall, which is what the
+  // Per-slice test metrics. Especially the legitimate-email recall, which is what the
   // SMS-only model was failing (flagging newsletters as spam).
   console.log("Per-source test breakdown:");
   evaluateSubset(testRows, (r) => r.source === "sms", vocab, mean, std, weights, bias, "SMS");

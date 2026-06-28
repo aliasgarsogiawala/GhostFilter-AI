@@ -1,4 +1,4 @@
-// Terminal command risk checker. New for the SDK — operates ONLY on the exact string you
+// Terminal command risk checker. It operates only on the exact string you
 // pass in (a CLI arg or piped line). It never reads shell history, dotfiles, or the
 // filesystem on its own; protection is explicit and opt-in by design.
 import type { ProtectResult } from "./types.js";
@@ -92,7 +92,7 @@ const COMMAND_RULES: Array<{ label: string; detail: string; severity: Severity; 
   },
   {
     label: "Package publish",
-    detail: "Publishes a package publicly — double-check the version and contents first.",
+    detail: "Publishes a package publicly. Double-check the version and contents first.",
     severity: "medium",
     pattern: /\bnpm\s+publish\b/i,
   },
@@ -137,7 +137,7 @@ export function checkCommand(input: string): ProtectResult {
     verdict === "dangerous"
       ? "Do not run this command. Review it manually and confirm the exact target before proceeding."
       : verdict === "suspicious"
-        ? "Review what this command targets before running it — confirm the path, branch, or variable is what you expect."
+        ? "Review what this command targets before running it. Confirm the path, branch, or variable is what you expect."
         : "No high-risk command patterns were found.";
 
   return {

@@ -2,7 +2,7 @@
 
 For a judge-focused walkthrough, architecture explanation, demo script, and honest limitations, see [`JUDGES.md`](JUDGES.md). Deferred ideas are tracked separately in [`FUTURE_ENHANCEMENTS.md`](FUTURE_ENHANCEMENTS.md).
 
-GhostFilter AI is a multipurpose safety firewall for **people and AI agents**.
+GhostFilter AI is a safety firewall for **people and AI agents**.
 
 It started as scam detection for suspicious messages, links, emails, and files. It now also protects **GhostGPT** from prompt injection before untrusted content enters an AI-agent context.
 
@@ -12,7 +12,7 @@ It started as scam detection for suspicious messages, links, emails, and files. 
 
 ## What judges should understand
 
-GhostFilter is not just a spam classifier. It is a security layer that sits before human action or AI-agent ingestion.
+GhostFilter goes beyond spam classification. It checks untrusted content before a person acts on it or an AI agent reads it.
 
 It protects against two major threat classes:
 
@@ -194,7 +194,7 @@ Safe result for human OR safe context for GhostGPT
 
 ## Product features
 
-- Sleek landing page with splash screen.
+- Focused landing page with a clear path into the scanner.
 - Dark/light mode.
 - Scam Shield mode.
 - GhostGPT Firewall mode.
@@ -204,7 +204,7 @@ Safe result for human OR safe context for GhostGPT
 - Judge demo page: `/demo`.
 - Batch evaluation page: `/eval`.
 - Fumadocs-powered developer docs: `/docs`.
-- Polished Ghosti Guard browser extension in `browser-extension/`.
+- Ghosti Guard browser extension in `browser-extension/`.
 - Message, email, link, and file scan modes.
 - Channel-specific scam templates for SMS, WhatsApp, Instagram DM, Telegram, and Discord.
 - 3D risk card and tactile UI surfaces.
@@ -399,8 +399,8 @@ The same detection engine is published as a standalone npm package:
 
 The package source also lives in [`packages/ghostfilter-ai`](packages/ghostfilter-ai), for developers who want to add
 GhostFilter protection to their own apps, CLIs, or AI agents without running this whole
-project. It covers both threat classes above — scams/phishing aimed at people and
-prompt-injection/unsafe tool-use instructions aimed at AI agents — and runs fully locally
+project. It covers both threat classes above: scams and phishing aimed at people,
+plus prompt injection and unsafe tool-use instructions aimed at AI agents. It runs locally
 with the same trained classifier and heuristics, so no API key is required.
 
 ```bash
@@ -455,7 +455,7 @@ Ideas not completed for the hackathon are deliberately kept out of the shipped-f
 
 ## Why this can win a hackathon
 
-GhostFilter is now a multipurpose security product:
+GhostFilter brings several practical safety tools into one product:
 
 - protects humans from scams
 - protects GhostGPT from prompt injection
@@ -463,6 +463,6 @@ GhostFilter is now a multipurpose security product:
 - generates safe context for AI-agent handoff
 - combines local ML, deterministic security rules, threat intelligence, and AI review
 - supports real channels: messages, email, links, files, Gmail, Drive, and GitHub
-- presents results in language normal users and judges can understand
+- explains results in language that people can understand
 
 It is a practical safety layer for both the public and the next generation of AI agents.

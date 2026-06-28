@@ -1,0 +1,51 @@
+{
+  "version": "0.2",
+  "language": "en,en-GB",
+  "useGitignore": true,
+  "files": [
+    "README.md",
+    "JUDGES.md",
+    "FUTURE_ENHANCEMENTS.md",
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "content/**/*.{md,mdx}",
+    "browser-extension/*.{md,html,js}",
+    "packages/ghostfilter-ai/**/*.{md,ts}"
+  ],
+  "ignorePaths": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "scripts/data/**",
+    "convex/_generated/**"
+  ],
+  "words": [
+    "Convex",
+    "Fumadocs",
+    "GhostFilter",
+    "GhostGPT",
+    "Ghosti",
+    "Ollama",
+    "Upstash",
+    "urlscan",
+    "WhatsApp",
+    "Telegram",
+    "lookalike",
+    "bpkill",
+    "deathtospamdeathtospamdeathtospam",
+    "hdfc",
+    "helpdesk",
+    "HMAC",
+    "icici",
+    "ncat",
+    "NEXTAUTH",
+    "nextpart",
+    "netbanking",
+    "nvme",
+    "optout",
+    "passkeys",
+    "Qwen",
+    "qwen",
+    "roleplay",
+    "scrypt"
+  ]
+}

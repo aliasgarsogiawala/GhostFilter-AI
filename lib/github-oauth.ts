@@ -1,4 +1,4 @@
-// GitHub OAuth — read-only access to the user's notifications, which is where
+// GitHub OAuth. Read-only access to the user's notifications, which is where
 // GitHub-channel scams surface (fake "security alert" issues, crypto-airdrop
 // spam mentions, impersonation in issue/PR comments).
 

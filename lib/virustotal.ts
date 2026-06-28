@@ -1,4 +1,4 @@
-// VirusTotal v3 lookups — read-only reputation checks. We never upload file
+// VirusTotal v3 provides read-only reputation checks. We never upload file
 // content or submit arbitrary user data for public scanning; file checks are
 // hash-only (see checkFileHash) so we never send someone's actual attachment
 // bytes to a third party.
@@ -27,7 +27,7 @@ export interface DomainReputation {
   reputation: number;
 }
 
-/** Domain-level reputation — synchronous, no submission/polling needed. */
+/** Domain-level reputation lookup with no submission or polling. */
 export async function checkDomainReputation(domain: string): Promise<DomainReputation | null> {
   try {
     const res = await fetch(`${VT_BASE}/domains/${encodeURIComponent(domain)}`, {
@@ -56,7 +56,7 @@ export interface FileReputation {
   harmless: number;
 }
 
-/** Looks up a file by its SHA-256 hash only — we never upload the file itself. */
+/** Looks up a file by its SHA-256 hash only; the file itself is never uploaded. */
 export async function checkFileHash(sha256: string): Promise<FileReputation> {
   try {
     const res = await fetch(`${VT_BASE}/files/${sha256}`, {

@@ -6,7 +6,7 @@ import { AuthSessionProvider } from "./AuthSessionProvider";
 import "./globals.css";
 
 // Space Grotesk (geometric, characterful) for UI + display, JetBrains Mono for
-// data/metrics — deliberately not the Next.js default Geist, which reads as a starter template.
+// data/metrics. Deliberately not the Next.js default Geist, which reads as a starter template.
 const displaySans = Space_Grotesk({
   variable: "--font-display",
   subsets: ["latin"],

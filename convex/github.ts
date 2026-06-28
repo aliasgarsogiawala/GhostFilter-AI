@@ -34,7 +34,7 @@ export const scanNotifications = action({
       },
     });
     if (!res.ok) {
-      throw new Error(`GitHub API error ${res.status} — try reconnecting GitHub.`);
+      throw new Error(`GitHub API error ${res.status}. Try reconnecting GitHub.`);
     }
     const notifications = (await res.json()) as GithubNotification[];
 
@@ -46,7 +46,7 @@ export const scanNotifications = action({
       });
       if (existing) continue;
 
-      // The notification title is the issue/PR/discussion subject — that's where GitHub
+      // The notification title is the issue/PR/discussion subject. That's where GitHub
       // scams show up (fake security alerts, airdrop spam, impersonation).
       const text = `${n.subject.title}\n\nRepository: ${n.repository.full_name} (${n.reason})`;
       const result = await runPipeline(text, { captureScreenshot: false });

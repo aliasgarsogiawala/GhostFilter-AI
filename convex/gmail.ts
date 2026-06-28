@@ -71,7 +71,7 @@ interface AttachmentIntel {
   vtSuspicious: number;
 }
 
-/** Hashes each attachment and checks the hash against VirusTotal — the file
+/** Hashes each attachment and checks the hash against VirusTotal. The file
  *  content itself is never uploaded anywhere, only its SHA-256 digest. */
 async function scanAttachments(
   gmail: ReturnType<typeof google.gmail>,
@@ -99,7 +99,7 @@ async function scanAttachments(
         vtSuspicious: rep.suspicious,
       });
     } catch {
-      // Skip this attachment on any failure — never block the rest of the scan over it.
+      // Skip this attachment on any failure. Never block the rest of the scan over it.
     }
   }
   return results;
@@ -165,7 +165,7 @@ export const scanInbox = action({
 
       const headerList = (full.data.payload as { headers?: { name?: string | null; value?: string | null }[] })?.headers ?? [];
 
-      // Skip the ~10-20s urlscan screenshot during bulk inbox scans — VT domain
+      // Skip the ~10-20s urlscan screenshot during bulk inbox scans. VT domain
       // checks (fast, synchronous) still run for every message. Real headers power the
       // PhishTool-style forensics (Reply-To / Return-Path / SPF-DKIM-DMARC spoofing checks).
       const result = await runPipeline(`Subject: ${subject}\n\n${body}`, {
@@ -176,7 +176,7 @@ export const scanInbox = action({
       const attachmentIntel = await scanAttachments(gmail, m.id, full.data.payload ?? undefined);
       const maliciousAttachment = attachmentIntel.find((a) => a.vtMalicious > 0);
       if (maliciousAttachment) {
-        // A hash-confirmed malicious attachment overrides everything else — this
+        // A hash-confirmed malicious attachment overrides everything else. This
         // isn't a judgment call the way a lookalike domain is, it's a direct hit.
         result.verdict = "scam";
         result.confidence = Math.max(result.confidence, 95);
