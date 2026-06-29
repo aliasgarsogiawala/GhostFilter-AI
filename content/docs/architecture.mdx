@@ -1,0 +1,71 @@
+---
+title: Architecture & Evaluation
+description: Detection layers, provider fallbacks, regression testing, and honest accuracy boundaries.
+---
+
+GhostFilter treats untrusted content as a pipeline rather than trusting one model score.
+
+```text
+Message, email, link, file, webpage, or tool output
+                         |
+              local ML and deterministic checks
+                         |
+             +-----------+-----------+
+             |                       |
+      scam/social evidence     prompt-injection firewall
+             |                       |
+             +-----------+-----------+
+                         |
+         email forensics and threat intelligence
+                         |
+             selective structured AI review
+                         |
+        human verdict or agent-safe context
+```
+
+## Detection layers
+
+1. A logistic-regression classifier performs local scam and spam triage.
+2. Deterministic rules identify payment, OTP, credential, impersonation, urgency,
+   account, prize, crypto, job, and service-disconnection patterns.
+3. The agent firewall checks instruction overrides, prompt extraction, data
+   exfiltration, jailbreak framing, hidden instructions, and unsafe tool use.
+4. Link checks inspect shortened URLs, redirects, lookalike domains, and reputation.
+5. Email forensics inspect sender, reply, return-path, SPF, DKIM, and DMARC evidence.
+6. VirusTotal and urlscan.io add optional external evidence.
+7. Gemini is used selectively for structured review and supported binary extraction.
+
+The SDK vendors a smaller local form of the classifier, social-engineering rules,
+agent firewall, safe-context generator, and command guard. The web platform adds
+connected sources, persistence, threat intelligence, files, and selective AI review.
+
+## Provider fallback
+
+- Gemini keys rotate between the two configured keys on quota or transient failures.
+- Core scam and prompt-injection checks continue locally without Gemini.
+- Ghosti uses deterministic evidence when Ollama is unreachable.
+- SDK agent checks fall back locally if its optional hosted API fails or exceeds eight seconds.
+- Rate limiting uses Upstash when configured and process-local bounded storage otherwise.
+
+## Evaluation
+
+The checked-in regression suite contains 50 curated scam and prompt-injection cases.
+Run it with:
+
+```bash
+npm run eval
+```
+
+The `/eval` page displays the same benchmark behavior for judges. The release command:
+
+```bash
+npm run verify
+```
+
+runs strict TypeScript checking, ESLint, the regression suite, dependency auditing, and
+the optimized production build.
+
+The 50 cases are regression tests for known hackathon scenarios. They are not an
+independent benchmark and do not prove universal real-world accuracy. GhostFilter can
+produce false positives and false negatives, so consequential actions still require
+verification and human approval.

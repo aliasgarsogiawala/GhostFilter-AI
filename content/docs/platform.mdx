@@ -1,0 +1,81 @@
+---
+title: Web Platform
+description: The GhostFilter application, scanner modes, connected sources, history, and judge routes.
+---
+
+The web platform is the human-facing GhostFilter product. It is separate from the
+`ghostfilter-ai` SDK, although both implement the same local-first safety idea.
+
+## Application routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` | Product overview and entry into the scanner |
+| `/dashboard` | Scam Shield, GhostGPT Firewall, connected sources, and scan history |
+| `/ghosti` | Focused scam and AI-safety assistant |
+| `/profile` | Per-user analytics and account details |
+| `/demo` | Deterministic judge walkthrough of an indirect prompt-injection attack |
+| `/eval` | Checked-in regression cases and evaluation metrics |
+| `/docs` | Developer and security documentation |
+
+## Scam Shield
+
+Scam Shield accepts pasted messages, email text, links, screenshots, PDFs, `.eml`
+messages, and supported text files. Results can include:
+
+- `safe`, `suspicious`, or `scam` verdict
+- confidence and local model risk
+- highlighted phrases and behavioral evidence
+- individual ensemble layers
+- email-header forensics
+- link and domain reputation
+- attachment hash reputation
+- a practical next action
+
+Scanning a file extracts text for analysis. GhostFilter does not execute uploaded files
+or scanned commands.
+
+## GhostGPT Firewall
+
+The firewall checks untrusted text before it reaches an AI agent. It returns `pass`,
+`isolate`, or `block`, explains its findings, and creates a safe context wrapper for
+risky content. Firewall history is stored separately from human-facing scam history.
+
+The same decision is available through the SDK and the documented REST endpoint.
+
+## Connected sources
+
+| Source | Current behavior |
+| --- | --- |
+| Gmail | Read-only scan of recent inbox messages |
+| Google Drive | Read-only scan of recently shared supported files and metadata |
+| GitHub | Read-only scan of notification-style content |
+| Slack | Read-only scan of content allowed by the configured Slack application |
+| Outlook | Prepared in code but outside the judged production path |
+| WhatsApp, Telegram, Discord, and SMS | Manual paste lanes; the web app does not read private chats |
+
+OAuth availability depends on each provider application being configured. Google must
+be published for accounts outside its test-user list. Connected-source tokens are
+encrypted before storage.
+
+## Accounts and history
+
+GhostFilter uses NextAuth sessions with Convex user records. Each account has isolated
+scan history, analytics, connected-source metadata, and correction feedback. Users can
+search, filter, sort, delete individual scans, or clear their history.
+
+Passwords are salted and hashed with scrypt. Plaintext passwords are never stored.
+
+## Optional services
+
+Core scam and firewall checks run without an external AI provider. Extra capabilities
+depend on configuration:
+
+- Gemini provides selective structured review and binary image/PDF extraction.
+- VirusTotal provides domain and attachment-hash reputation.
+- urlscan.io provides sandboxed page previews.
+- Upstash provides shared rate limiting across server instances.
+- Ollama provides open-model responses for Ghosti when reachable by the server.
+
+If an optional service is unavailable, GhostFilter either uses its documented local
+fallback or omits that enrichment without executing untrusted content.

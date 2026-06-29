@@ -43,6 +43,10 @@ Google, GitHub, and Slack connectors request read-only access for scanning. OAut
 are encrypted before storage. Public Convex queries strip token fields before returning
 connection metadata to the browser.
 
+The Next.js OAuth callback and Convex scanner must use the same
+`OAUTH_TOKEN_ENCRYPTION_KEY`. Changing that key requires users to reconnect the affected
+provider. Outlook is prepared in code but is outside the judged production path.
+
 ## Authentication
 
 Web accounts are stored in Convex. Emails are normalized and unique. Passwords use

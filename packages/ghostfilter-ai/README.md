@@ -6,7 +6,7 @@ trusts it. GhostFilter is best known as a scam/phishing detector, but the same e
 also catches the other side of the same problem: prompt injection and unsafe tool-use
 instructions aimed at an AI agent.
 
-This package is the SDK version of [GhostFilter AI](https://github.com/aliasgarsogiawala/ghostfilter):
+This package is the SDK version of [GhostFilter AI](https://github.com/aliasgarsogiawala/GhostFilter-AI):
 it vendors the same detection logic (a trained logistic-regression scam classifier plus
 a deterministic agent-firewall/prompt-injection ruleset) so you can drop it into your
 own app, CLI, or agent with **no API key and no network call required**.

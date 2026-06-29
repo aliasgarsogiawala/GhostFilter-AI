@@ -1,0 +1,83 @@
+---
+title: Ghosti Assistant
+description: How Ghosti uses local evidence, Ollama, scope controls, and deterministic fallback responses.
+---
+
+Ghosti is GhostFilter's focused conversational assistant for scams, phishing, suspicious
+links, account security, prompt injection, and AI safety. It is an MVP and displays this
+disclaimer:
+
+> Ghosti is still under training, so it can make mistakes. This MVP gives safety
+> guidance, not a guarantee.
+
+## Response pipeline
+
+For each relevant message, Ghosti first creates deterministic context from:
+
+- the local scam classifier
+- the scam and social-engineering ensemble
+- prompt-injection findings
+- the GhostGPT agent-firewall decision
+- the strongest explainable evidence
+
+When Ollama is reachable, this context is inserted into Ghosti's system prompt and the
+open model produces the conversational answer. When Ollama is unavailable, Ghosti
+returns a deterministic answer from the same local evidence.
+
+Unrelated questions are redirected to Ghosti's safety scope. Up to eight recent valid
+messages are included, and each message is limited to 4,000 characters.
+
+## Local Ollama setup
+
+Ollama running on the same machine does **not** require an API key.
+
+Install Ollama, then run:
+
+```bash
+ollama serve
+ollama pull qwen2.5:3b-instruct
+```
+
+Configure GhostFilter:
+
+```bash
+GHOSTI_OLLAMA_MODEL=qwen2.5:3b-instruct
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+```
+
+Start GhostFilter with `npm run dev`. The Next.js server calls the local Ollama process;
+the browser does not connect to Ollama directly.
+
+## What judges receive
+
+The deployed Vercel server cannot reach Ollama running on a judge's laptop through
+`127.0.0.1`. Judges can still use Ghosti because the production route returns its
+deterministic safety fallback.
+
+To test open-model responses, a judge can clone the project and run Ollama locally using
+the steps above. No Ollama API key is needed for that setup.
+
+Alternatively, a deployment owner can configure a hosted Ollama-compatible endpoint:
+
+```bash
+OLLAMA_BASE_URL=https://your-protected-model-endpoint.example.com
+OLLAMA_API_KEY=your-provider-token
+GHOSTI_OLLAMA_MODEL=qwen2.5:3b-instruct
+```
+
+`OLLAMA_API_KEY` is only for a hosted endpoint that requires bearer authentication. It
+is not a key that judges must provide to use local Ollama.
+
+## Training status
+
+Ghosti has not been presented as a newly fine-tuned model checkpoint. In this MVP,
+"training" means:
+
+- grounding the model with GhostFilter evidence
+- a safety-focused system prompt
+- curated examples
+- deterministic relevance controls
+- regression evaluation and correction feedback
+
+Fine-tuning a consented, redacted dataset and hosting a validated open model are future
+enhancements.

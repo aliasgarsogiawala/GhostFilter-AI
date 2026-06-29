@@ -1,4 +1,4 @@
 {
   "title": "GhostFilter Docs",
-  "pages": ["index", "quickstart", "sdk", "cli", "agent-firewall", "browser-extension", "security"]
+  "pages": ["index", "platform", "ghosti", "architecture", "quickstart", "sdk", "cli", "agent-firewall", "browser-extension", "security"]
 }
