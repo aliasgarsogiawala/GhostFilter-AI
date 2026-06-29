@@ -11,6 +11,21 @@ them. It is local-first and works without an API key or network call.
 import { ghostfilter } from "ghostfilter-ai";
 ```
 
+The package includes TypeScript declarations, so its functions, options, and results
+are typed in compatible editors and build tools. It does not include the GhostFilter
+dashboard, authentication, connected accounts, or scan-history storage.
+
+## How it works
+
+The local scam check combines a bundled logistic-regression classifier with
+deterministic social-engineering rules. The agent check uses a deterministic firewall
+for instruction overrides, prompt extraction, secret exfiltration, unsafe tool use,
+jailbreak framing, and embedded instructions. Command protection uses a separate set
+of explicit terminal-risk rules.
+
+The SDK inspects only the string supplied by the calling application. It does not read
+files, messages, shell history, environment variables, or connected accounts by itself.
+
 ## Functions
 
 ### `protect({ input, mode })`
@@ -127,3 +142,13 @@ If configuration is absent, the request times out, or the API rejects the call,
 - ESM-compatible TypeScript or JavaScript project
 - No runtime dependencies
 - No API key for local operation
+
+## Current boundaries
+
+- Text inputs are limited to the first 20,000 characters.
+- `checkCommand()` inspects a command but never executes or blocks it automatically.
+- The SDK does not parse binary files or connect directly to Gmail, Drive, GitHub, or Slack.
+- `protect()` is asynchronous. The direct local check functions are synchronous.
+- API mode applies only to the agent portion of `protect()`.
+- Remote checks time out after eight seconds and then use the local fallback.
+- Results are risk guidance, not a guarantee that content is safe or malicious.
